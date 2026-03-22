@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package realtime.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/yohnnn/public-survey-platform/back/api/gen/go/realtime/v1;realtimev1";
+
+service RealtimeService {
+  rpc StreamPollUpdates(StreamPollUpdatesRequest) returns (stream StreamPollUpdatesResponse) {
+    option (google.api.http) = {
+      get: "/v1/realtime/polls/{poll_id}/stream"
+    };
+  }
+
+  rpc WSHandshake(WSHandshakeRequest) returns (WSHandshakeResponse) {
+    option (google.api.http) = {
+      get: "/v1/ws"
+    };
+  }
+}
+
+message StreamPollUpdatesRequest {
+  string poll_id = 1;
+}
+
+message StreamPollUpdatesResponse {
+  string event = 1;
+  string poll_id = 2;
+  string option_id = 3;
+  int64 total_votes = 4;
+  google.protobuf.Timestamp timestamp = 5;
+}
+
+message WSHandshakeRequest {}
+
+message WSHandshakeResponse {
+  string connection_id = 1;
+}

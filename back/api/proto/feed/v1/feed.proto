@@ -1,0 +1,77 @@
+syntax = "proto3";
+
+package feed.v1;
+
+import "common/v1/pagination.proto";
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/yohnnn/public-survey-platform/back/api/gen/go/feed/v1;feedv1";
+
+service FeedService {
+  rpc GetFeed(GetFeedRequest) returns (GetFeedResponse) {
+    option (google.api.http) = {
+      get: "/v1/feed"
+    };
+  }
+
+  rpc GetTrending(GetTrendingRequest) returns (GetTrendingResponse) {
+    option (google.api.http) = {
+      get: "/v1/feed/trending"
+    };
+  }
+
+  rpc GetUserPolls(GetUserPollsRequest) returns (GetUserPollsResponse) {
+    option (google.api.http) = {
+      get: "/v1/feed/user/{user_id}"
+    };
+  }
+}
+
+message FeedOption {
+  string id = 1;
+  string text = 2;
+  int64 votes_count = 3;
+}
+
+message FeedItem {
+  string id = 1;
+  string question = 2;
+  int64 total_votes = 3;
+  repeated FeedOption options = 4;
+  repeated string tags = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
+
+message GetFeedRequest {
+  string cursor = 1;
+  uint32 limit = 2;
+  string sort = 3;
+  repeated string tags = 4;
+}
+
+message GetTrendingRequest {
+  string cursor = 1;
+  uint32 limit = 2;
+}
+
+message GetUserPollsRequest {
+  string user_id = 1;
+  string cursor = 2;
+  uint32 limit = 3;
+}
+
+message GetFeedResponse {
+  repeated FeedItem items = 1;
+  common.v1.CursorPageMeta page = 2;
+}
+
+message GetTrendingResponse {
+  repeated FeedItem items = 1;
+  common.v1.CursorPageMeta page = 2;
+}
+
+message GetUserPollsResponse {
+  repeated FeedItem items = 1;
+  common.v1.CursorPageMeta page = 2;
+}

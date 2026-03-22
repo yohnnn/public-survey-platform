@@ -1,0 +1,106 @@
+syntax = "proto3";
+
+package analytics.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/yohnnn/public-survey-platform/back/api/gen/go/analytics/v1;analyticsv1";
+
+service AnalyticsService {
+  rpc GetPollAnalytics(GetPollAnalyticsRequest) returns (GetPollAnalyticsResponse) {
+    option (google.api.http) = {
+      get: "/v1/polls/{poll_id}/analytics"
+    };
+  }
+
+  rpc GetCountryStats(GetCountryStatsRequest) returns (GetCountryStatsResponse) {
+    option (google.api.http) = {
+      get: "/v1/polls/{poll_id}/analytics/countries"
+    };
+  }
+
+  rpc GetGenderStats(GetGenderStatsRequest) returns (GetGenderStatsResponse) {
+    option (google.api.http) = {
+      get: "/v1/polls/{poll_id}/analytics/gender"
+    };
+  }
+
+  rpc GetAgeStats(GetAgeStatsRequest) returns (GetAgeStatsResponse) {
+    option (google.api.http) = {
+      get: "/v1/polls/{poll_id}/analytics/age"
+    };
+  }
+}
+
+message GetPollAnalyticsRequest {
+  string poll_id = 1;
+  google.protobuf.Timestamp from = 2;
+  google.protobuf.Timestamp to = 3;
+  string interval = 4;
+}
+
+message OptionStat {
+  string option_id = 1;
+  int64 votes = 2;
+}
+
+message CountryStat {
+  string country = 1;
+  int64 votes = 2;
+}
+
+message GenderStat {
+  string gender = 1;
+  int64 votes = 2;
+}
+
+message AgeStat {
+  string age_range = 1;
+  int64 votes = 2;
+}
+
+message GetPollAnalyticsResponse {
+  string poll_id = 1;
+  int64 total_votes = 2;
+  repeated OptionStat options = 3;
+  repeated CountryStat countries = 4;
+  repeated GenderStat gender = 5;
+  repeated AgeStat age = 6;
+}
+
+message GetCountryStatsRequest {
+  string poll_id = 1;
+  google.protobuf.Timestamp from = 2;
+  google.protobuf.Timestamp to = 3;
+  string interval = 4;
+}
+
+message GetCountryStatsResponse {
+  string poll_id = 1;
+  repeated CountryStat items = 2;
+}
+
+message GetGenderStatsRequest {
+  string poll_id = 1;
+  google.protobuf.Timestamp from = 2;
+  google.protobuf.Timestamp to = 3;
+  string interval = 4;
+}
+
+message GetGenderStatsResponse {
+  string poll_id = 1;
+  repeated GenderStat items = 2;
+}
+
+message GetAgeStatsRequest {
+  string poll_id = 1;
+  google.protobuf.Timestamp from = 2;
+  google.protobuf.Timestamp to = 3;
+  string interval = 4;
+}
+
+message GetAgeStatsResponse {
+  string poll_id = 1;
+  repeated AgeStat items = 2;
+}

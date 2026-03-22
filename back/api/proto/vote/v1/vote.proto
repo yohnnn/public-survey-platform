@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package vote.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/yohnnn/public-survey-platform/back/api/gen/go/vote/v1;votev1";
+
+service VoteService {
+  rpc Vote(VoteRequest) returns (VoteResponse) {
+    option (google.api.http) = {
+      post: "/v1/polls/{poll_id}/vote"
+      body: "*"
+    };
+  }
+
+  rpc RemoveVote(RemoveVoteRequest) returns (RemoveVoteResponse) {
+    option (google.api.http) = {
+      delete: "/v1/polls/{poll_id}/vote"
+    };
+  }
+
+  rpc GetUserVote(GetUserVoteRequest) returns (GetUserVoteResponse) {
+    option (google.api.http) = {
+      get: "/v1/polls/{poll_id}/vote"
+    };
+  }
+}
+
+message VoteRequest {
+  string poll_id = 1;
+  repeated string option_ids = 2;
+}
+
+message VoteResponse {
+  string poll_id = 1;
+  repeated string option_ids = 2;
+  google.protobuf.Timestamp voted_at = 3;
+}
+
+message RemoveVoteRequest {
+  string poll_id = 1;
+}
+
+message RemoveVoteResponse {
+  bool success = 1;
+}
+
+message GetUserVoteRequest {
+  string poll_id = 1;
+}
+
+message GetUserVoteResponse {
+  string poll_id = 1;
+  bool has_voted = 2;
+  repeated string option_ids = 3;
+  google.protobuf.Timestamp voted_at = 4;
+}

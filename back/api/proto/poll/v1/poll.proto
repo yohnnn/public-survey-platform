@@ -1,0 +1,153 @@
+syntax = "proto3";
+
+package poll.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/yohnnn/public-survey-platform/back/api/gen/go/poll/v1;pollv1";
+
+enum PollType {
+  POLL_TYPE_UNSPECIFIED = 0;
+  POLL_TYPE_SINGLE_CHOICE = 1;
+  POLL_TYPE_MULTIPLE_CHOICE = 2;
+}
+
+message PollOption {
+  string id = 1;
+  string text = 2;
+  int64 votes_count = 3;
+}
+
+message Poll {
+  string id = 1;
+  string creator_id = 2;
+  string question = 3;
+  PollType type = 4;
+  bool is_anonymous = 5;
+  google.protobuf.Timestamp ends_at = 6;
+  google.protobuf.Timestamp created_at = 7;
+  int64 total_votes = 8;
+  repeated PollOption options = 9;
+  repeated string tags = 10;
+}
+
+service PollService {
+  rpc CreatePoll(CreatePollRequest) returns (CreatePollResponse) {
+    option (google.api.http) = {
+      post: "/v1/polls"
+      body: "*"
+    };
+  }
+
+  rpc GetPoll(GetPollRequest) returns (GetPollResponse) {
+    option (google.api.http) = {
+      get: "/v1/polls/{id}"
+    };
+  }
+
+  rpc ListPolls(ListPollsRequest) returns (ListPollsResponse) {
+    option (google.api.http) = {
+      get: "/v1/polls"
+    };
+  }
+
+  rpc UpdatePoll(UpdatePollRequest) returns (UpdatePollResponse) {
+    option (google.api.http) = {
+      patch: "/v1/polls/{id}"
+      body: "*"
+    };
+  }
+
+  rpc DeletePoll(DeletePollRequest) returns (DeletePollResponse) {
+    option (google.api.http) = {
+      delete: "/v1/polls/{id}"
+    };
+  }
+
+  rpc CreateTag(CreateTagRequest) returns (CreateTagResponse) {
+    option (google.api.http) = {
+      post: "/v1/tags"
+      body: "*"
+    };
+  }
+
+  rpc ListTags(ListTagsRequest) returns (ListTagsResponse) {
+    option (google.api.http) = {
+      get: "/v1/tags"
+    };
+  }
+}
+
+message CreatePollRequest {
+  string question = 1;
+  PollType type = 2;
+  bool is_anonymous = 3;
+  google.protobuf.Timestamp ends_at = 4;
+  repeated string options = 5;
+  repeated string tags = 6;
+}
+
+message GetPollRequest {
+  string id = 1;
+}
+
+message ListPollsRequest {
+  string cursor = 1;
+  uint32 limit = 2;
+  repeated string tags = 3;
+}
+
+message ListPollsResponse {
+  repeated Poll items = 1;
+  string next_cursor = 2;
+  bool has_more = 3;
+}
+
+message CreatePollResponse {
+  Poll poll = 1;
+}
+
+message GetPollResponse {
+  Poll poll = 1;
+}
+
+message UpdatePollResponse {
+  Poll poll = 1;
+}
+
+message UpdatePollRequest {
+  string id = 1;
+  string question = 2;
+  bool is_anonymous = 3;
+  google.protobuf.Timestamp ends_at = 4;
+  repeated string tags = 5;
+}
+
+message DeletePollRequest {
+  string id = 1;
+}
+
+message DeletePollResponse {
+  bool success = 1;
+}
+
+message Tag {
+  string id = 1;
+  string name = 2;
+  google.protobuf.Timestamp created_at = 3;
+}
+
+message CreateTagRequest {
+  string name = 1;
+}
+
+message CreateTagResponse {
+  Tag tag = 1;
+}
+
+message ListTagsRequest {}
+
+message ListTagsResponse {
+  repeated Tag items = 1;
+}

@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package common.v1;
+
+option go_package = "github.com/yohnnn/public-survey-platform/back/api/gen/go/common/v1;commonv1";
+
+message ErrorDetail {
+  string field = 1;
+  string reason = 2;
+}
+
+message Error {
+  string code = 1;
+  string message = 2;
+  repeated ErrorDetail details = 3;
+}

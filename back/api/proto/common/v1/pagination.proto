@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package common.v1;
+
+option go_package = "github.com/yohnnn/public-survey-platform/back/api/gen/go/common/v1;commonv1";
+
+message CursorPageRequest {
+  string cursor = 1;
+  uint32 limit = 2;
+}
+
+message CursorPageMeta {
+  string next_cursor = 1;
+  bool has_more = 2;
+  uint32 limit = 3;
+}
