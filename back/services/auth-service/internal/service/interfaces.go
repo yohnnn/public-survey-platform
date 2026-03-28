@@ -36,10 +36,6 @@ type TokenManager interface {
 	ParseRefreshToken(token string) (userID string, sessionID string, err error)
 }
 
-type TxManager interface {
-	WithTx(ctx context.Context, fn func(ctx context.Context) error) error
-}
-
 type Clock interface {
 	Now() time.Time
 }

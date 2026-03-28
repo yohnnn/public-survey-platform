@@ -1,0 +1,119 @@
+services:
+  auth-postgres:
+    image: postgres:16-alpine
+    container_name: psp-auth-postgres
+    environment:
+      POSTGRES_DB: auth_service
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - auth_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d auth_service"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  auth-migrate:
+    image: migrate/migrate:v4.18.3
+    container_name: psp-auth-migrate
+    volumes:
+      - ./back/services/auth-service/migrations:/migrations
+    depends_on:
+      auth-postgres:
+        condition: service_healthy
+    command:
+      - -path=/migrations
+      - -database=postgres://postgres:postgres@auth-postgres:5432/auth_service?sslmode=disable
+      - up
+    restart: "no"
+
+  auth-service:
+    container_name: psp-auth-service
+    build:
+      context: ./back
+      dockerfile: services/auth-service/Dockerfile
+    env_file:
+      - ./back/services/auth-service/.env
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@auth-postgres:5432/auth_service?sslmode=disable
+    ports:
+      - "50051:50051"
+    depends_on:
+      auth-postgres:
+        condition: service_healthy
+      auth-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  poll-postgres:
+    image: postgres:16-alpine
+    container_name: psp-poll-postgres
+    environment:
+      POSTGRES_DB: poll_service
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5434:5432"
+    volumes:
+      - poll_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d poll_service"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  poll-migrate:
+    image: migrate/migrate:v4.18.3
+    container_name: psp-poll-migrate
+    volumes:
+      - ./back/services/poll-service/migrations:/migrations
+    depends_on:
+      poll-postgres:
+        condition: service_healthy
+    command:
+      - -path=/migrations
+      - -database=postgres://postgres:postgres@poll-postgres:5432/poll_service?sslmode=disable
+      - up
+    restart: "no"
+
+  poll-service:
+    container_name: psp-poll-service
+    build:
+      context: ./back
+      dockerfile: services/poll-service/Dockerfile
+    env_file:
+      - ./back/services/poll-service/.env
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@poll-postgres:5432/poll_service?sslmode=disable
+      AUTH_GRPC_ENDPOINT: auth-service:50051
+    ports:
+      - "50052:50052"
+    depends_on:
+      poll-postgres:
+        condition: service_healthy
+      poll-migrate:
+        condition: service_completed_successfully
+      auth-service:
+        condition: service_started
+    restart: unless-stopped
+
+  api-service:
+    container_name: psp-api-service
+    build:
+      context: ./back
+      dockerfile: services/api-service/Dockerfile
+    env_file:
+      - ./back/services/api-service/.env
+    ports:
+      - "8080:8080"
+    depends_on:
+      - auth-service
+      - poll-service
+    restart: unless-stopped
+
+volumes:
+  auth_postgres_data:
+  poll_postgres_data:

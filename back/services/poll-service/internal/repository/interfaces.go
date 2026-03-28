@@ -1,0 +1,38 @@
+package repository
+
+import (
+	"context"
+	"time"
+
+	"github.com/yohnnn/public-survey-platform/back/services/poll-service/internal/models"
+)
+
+type PollListFilter struct {
+	CursorCreatedAt *time.Time
+	CursorID        string
+	Limit           int
+	Tags            []string
+}
+
+type PollPatch struct {
+	Question    *string
+	IsAnonymous *bool
+	EndsAt      *time.Time
+}
+
+type PollRepository interface {
+	Create(ctx context.Context, poll models.Poll, options []models.PollOption, tagIDs []string) error
+	GetByID(ctx context.Context, id string) (models.Poll, error)
+	List(ctx context.Context, filter PollListFilter) ([]models.Poll, error)
+	UpdateByIDAndCreator(ctx context.Context, pollID, creatorID string, patch PollPatch) error
+	DeleteByIDAndCreator(ctx context.Context, pollID, creatorID string) error
+	ReplaceTags(ctx context.Context, pollID string, tagIDs []string) error
+	GetOptionsByPollIDs(ctx context.Context, pollIDs []string) (map[string][]models.PollOption, error)
+	GetTagsByPollIDs(ctx context.Context, pollIDs []string) (map[string][]string, error)
+}
+
+type TagRepository interface {
+	Create(ctx context.Context, tag models.Tag) (models.Tag, error)
+	List(ctx context.Context) ([]models.Tag, error)
+	EnsureByNames(ctx context.Context, names []string) ([]models.Tag, error)
+}
