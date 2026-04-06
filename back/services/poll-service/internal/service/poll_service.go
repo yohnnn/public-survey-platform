@@ -2,37 +2,43 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/yohnnn/public-survey-platform/back/api/events"
+	"github.com/yohnnn/public-survey-platform/back/pkg/outbox"
 	"github.com/yohnnn/public-survey-platform/back/pkg/tx"
 	"github.com/yohnnn/public-survey-platform/back/services/poll-service/internal/models"
 	"github.com/yohnnn/public-survey-platform/back/services/poll-service/internal/repository"
 )
 
 type pollService struct {
-	polls repository.PollRepository
-	tags  repository.TagRepository
-	tx    tx.Manager
-	clock Clock
-	ids   IDGenerator
+	polls  repository.PollRepository
+	tags   repository.TagRepository
+	outbox repository.OutboxRepository
+	tx     tx.Manager
+	clock  Clock
+	ids    IDGenerator
 }
 
 func NewPollService(
 	polls repository.PollRepository,
 	tags repository.TagRepository,
+	outbox repository.OutboxRepository,
 	tx tx.Manager,
 	clock Clock,
 	ids IDGenerator,
 ) PollService {
 	return &pollService{
-		polls: polls,
-		tags:  tags,
-		tx:    tx,
-		clock: clock,
-		ids:   ids,
+		polls:  polls,
+		tags:   tags,
+		outbox: outbox,
+		tx:     tx,
+		clock:  clock,
+		ids:    ids,
 	}
 }
 
@@ -88,6 +94,20 @@ func (s *pollService) CreatePoll(ctx context.Context, userID, question string, p
 
 		if createErr := s.polls.Create(txCtx, poll, pollOptions, tagIDs); createErr != nil {
 			return createErr
+		}
+
+		payload, eventErr := marshalPollCreatedPayload(poll, pollOptions, normalizedTags)
+		if eventErr != nil {
+			return eventErr
+		}
+
+		if outboxErr := s.outbox.Add(txCtx, outbox.Event{
+			ID:      s.ids.NewID(),
+			Topic:   events.TopicPollCreated,
+			Key:     poll.ID,
+			Payload: payload,
+		}); outboxErr != nil {
+			return outboxErr
 		}
 		return nil
 	})
@@ -336,4 +356,50 @@ func normalizeEndsAt(endsAt *time.Time) *time.Time {
 	}
 	v := endsAt.UTC()
 	return &v
+}
+
+type pollCreatedPayload struct {
+	PollID      string       `json:"poll_id"`
+	CreatorID   string       `json:"creator_id"`
+	Question    string       `json:"question"`
+	Type        int32        `json:"type"`
+	IsAnonymous bool         `json:"is_anonymous"`
+	EndsAt      *time.Time   `json:"ends_at,omitempty"`
+	CreatedAt   time.Time    `json:"created_at"`
+	Options     []pollOption `json:"options"`
+	Tags        []string     `json:"tags"`
+}
+
+type pollOption struct {
+	ID       string `json:"id"`
+	Text     string `json:"text"`
+	Position int32  `json:"position"`
+}
+
+func marshalPollCreatedPayload(poll models.Poll, options []models.PollOption, tags []string) ([]byte, error) {
+	payloadOptions := make([]pollOption, 0, len(options))
+	for _, option := range options {
+		payloadOptions = append(payloadOptions, pollOption{
+			ID:       option.ID,
+			Text:     option.Text,
+			Position: option.Position,
+		})
+	}
+
+	payload, err := json.Marshal(pollCreatedPayload{
+		PollID:      poll.ID,
+		CreatorID:   poll.CreatorID,
+		Question:    poll.Question,
+		Type:        int32(poll.Type),
+		IsAnonymous: poll.IsAnonymous,
+		EndsAt:      poll.EndsAt,
+		CreatedAt:   poll.CreatedAt,
+		Options:     payloadOptions,
+		Tags:        tags,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return payload, nil
 }

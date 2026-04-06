@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/yohnnn/public-survey-platform/back/pkg/outbox"
 	"github.com/yohnnn/public-survey-platform/back/services/poll-service/internal/models"
 )
 
@@ -35,4 +36,11 @@ type TagRepository interface {
 	Create(ctx context.Context, tag models.Tag) (models.Tag, error)
 	List(ctx context.Context) ([]models.Tag, error)
 	EnsureByNames(ctx context.Context, names []string) ([]models.Tag, error)
+}
+
+type OutboxRepository interface {
+	Add(ctx context.Context, event outbox.Event) error
+	ListUnpublished(ctx context.Context, limit int) ([]outbox.Event, error)
+	MarkPublished(ctx context.Context, eventID string, publishedAt time.Time) error
+	MarkFailed(ctx context.Context, eventID, reason string) error
 }

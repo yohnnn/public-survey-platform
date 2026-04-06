@@ -632,7 +632,7 @@ type UpdatePollRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Question      string                 `protobuf:"bytes,2,opt,name=question,proto3" json:"question,omitempty"`
-	IsAnonymous   bool                   `protobuf:"varint,3,opt,name=is_anonymous,json=isAnonymous,proto3" json:"is_anonymous,omitempty"`
+	IsAnonymous   *bool                  `protobuf:"varint,3,opt,name=is_anonymous,json=isAnonymous,proto3,oneof" json:"is_anonymous,omitempty"`
 	EndsAt        *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=ends_at,json=endsAt,proto3" json:"ends_at,omitempty"`
 	Tags          []string               `protobuf:"bytes,5,rep,name=tags,proto3" json:"tags,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -684,8 +684,8 @@ func (x *UpdatePollRequest) GetQuestion() string {
 }
 
 func (x *UpdatePollRequest) GetIsAnonymous() bool {
-	if x != nil {
-		return x.IsAnonymous
+	if x != nil && x.IsAnonymous != nil {
+		return *x.IsAnonymous
 	}
 	return false
 }
@@ -1069,13 +1069,14 @@ const file_poll_v1_poll_proto_rawDesc = "" +
 	"\x0fGetPollResponse\x12!\n" +
 	"\x04poll\x18\x01 \x01(\v2\r.poll.v1.PollR\x04poll\"7\n" +
 	"\x12UpdatePollResponse\x12!\n" +
-	"\x04poll\x18\x01 \x01(\v2\r.poll.v1.PollR\x04poll\"\xab\x01\n" +
+	"\x04poll\x18\x01 \x01(\v2\r.poll.v1.PollR\x04poll\"\xc1\x01\n" +
 	"\x11UpdatePollRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1a\n" +
-	"\bquestion\x18\x02 \x01(\tR\bquestion\x12!\n" +
-	"\fis_anonymous\x18\x03 \x01(\bR\visAnonymous\x123\n" +
+	"\bquestion\x18\x02 \x01(\tR\bquestion\x12&\n" +
+	"\fis_anonymous\x18\x03 \x01(\bH\x00R\visAnonymous\x88\x01\x01\x123\n" +
 	"\aends_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\x06endsAt\x12\x12\n" +
-	"\x04tags\x18\x05 \x03(\tR\x04tags\"#\n" +
+	"\x04tags\x18\x05 \x03(\tR\x04tagsB\x0f\n" +
+	"\r_is_anonymous\"#\n" +
 	"\x11DeletePollRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\".\n" +
 	"\x12DeletePollResponse\x12\x18\n" +
@@ -1185,6 +1186,7 @@ func file_poll_v1_poll_proto_init() {
 	if File_poll_v1_poll_proto != nil {
 		return
 	}
+	file_poll_v1_poll_proto_msgTypes[9].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

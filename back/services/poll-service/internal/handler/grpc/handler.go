@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	grpcinterceptors "github.com/yohnnn/public-survey-platform/back/services/poll-service/internal/handler/grpc/interceptors"
 	pollv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/poll/v1"
+	grpcinterceptors "github.com/yohnnn/public-survey-platform/back/services/poll-service/internal/handler/grpc/interceptors"
 	"github.com/yohnnn/public-survey-platform/back/services/poll-service/internal/models"
 	"github.com/yohnnn/public-survey-platform/back/services/poll-service/internal/service"
 )
@@ -90,8 +90,11 @@ func (h *Handler) UpdatePoll(ctx context.Context, req *pollv1.UpdatePollRequest)
 		endsAt = et
 	}
 
-	anon := req.GetIsAnonymous()
-	isAnonymous := &anon
+	var isAnonymous *bool
+	if req.IsAnonymous != nil {
+		anon := req.GetIsAnonymous()
+		isAnonymous = &anon
+	}
 
 	poll, err := h.svc.UpdatePoll(
 		ctx,

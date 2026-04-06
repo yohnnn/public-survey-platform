@@ -13,6 +13,7 @@ import (
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	authv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/auth/v1"
 	pollv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/poll/v1"
+	votev1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/vote/v1"
 	"github.com/yohnnn/public-survey-platform/back/services/api-service/internal/config"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -54,6 +55,9 @@ func main() {
 	}
 	if err := pollv1.RegisterPollServiceHandlerFromEndpoint(ctx, mux, cfg.PollGRPCEndpoint, dialOptions); err != nil {
 		logger.Fatalf("register poll gateway handlers: %v", err)
+	}
+	if err := votev1.RegisterVoteServiceHandlerFromEndpoint(ctx, mux, cfg.VoteGRPCEndpoint, dialOptions); err != nil {
+		logger.Fatalf("register vote gateway handlers: %v", err)
 	}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net"
 	"os"
@@ -13,8 +14,10 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/yohnnn/public-survey-platform/back/api/events"
 	authv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/auth/v1"
 	pollv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/poll/v1"
+	"github.com/yohnnn/public-survey-platform/back/pkg/outbox"
 	"github.com/yohnnn/public-survey-platform/back/pkg/tx"
 	"github.com/yohnnn/public-survey-platform/back/services/poll-service/internal/config"
 	grpcHandler "github.com/yohnnn/public-survey-platform/back/services/poll-service/internal/handler/grpc"
@@ -49,11 +52,38 @@ func main() {
 
 	pollRepo := postgres.NewPollRepository(pool)
 	tagRepo := postgres.NewTagRepository(pool)
+	outboxRepo := postgres.NewOutboxRepository(pool)
 	txMgr := tx.NewManager(pool)
 	clock := service.NewSystemClock()
 	idGen := service.NewRandomIDGenerator()
 
-	pollSvc := service.NewPollService(pollRepo, tagRepo, *txMgr, clock, idGen)
+	pollSvc := service.NewPollService(pollRepo, tagRepo, outboxRepo, *txMgr, clock, idGen)
+
+	var publisher events.Publisher = events.NewLogPublisher(logger)
+	if cfg.EventPublisher == "kafka" {
+		kafkaPublisher, pubErr := events.NewKafkaPublisher(events.KafkaPublisherConfig{
+			Brokers:      cfg.KafkaBrokers,
+			TopicPrefix:  cfg.KafkaTopicPrefix,
+			WriteTimeout: cfg.KafkaWriteTimeout,
+		})
+		if pubErr != nil {
+			logger.Fatalf("create kafka publisher: %v", pubErr)
+		}
+		defer func() {
+			if closeErr := kafkaPublisher.Close(); closeErr != nil {
+				logger.Printf("close kafka publisher error: %v", closeErr)
+			}
+		}()
+		publisher = kafkaPublisher
+	}
+
+	outboxRelay := outbox.NewRelay(outboxRepo, publisher, outbox.NewSystemClock(), logger, cfg.OutboxInterval, cfg.OutboxBatchSize)
+
+	go func() {
+		if runErr := outboxRelay.Run(ctx); runErr != nil && !errors.Is(runErr, context.Canceled) {
+			logger.Printf("outbox relay stopped: %v", runErr)
+		}
+	}()
 
 	authInterceptor := grpcinterceptors.UnaryAuthInterceptor(authClient)
 	loggingInterceptor := grpcinterceptors.UnaryLoggingInterceptor(logger)

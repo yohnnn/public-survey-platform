@@ -109,12 +109,9 @@ func (r *SessionRepository) RevokeAllByUserID(ctx context.Context, userID string
 	`
 
 	exec := tx.Executor(ctx, r.pool)
-	cmd, err := exec.Exec(ctx, query, userID, revokedAt)
+	_, err := exec.Exec(ctx, query, userID, revokedAt)
 	if err != nil {
 		return err
-	}
-	if cmd.RowsAffected() == 0 {
-		return models.ErrSessionNotFound
 	}
 	return nil
 }

@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS poll_options (
     PRIMARY KEY (poll_id, position)
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_poll_options_id_unique ON poll_options(id);
+
 CREATE TABLE IF NOT EXISTS poll_tags (
     poll_id TEXT NOT NULL REFERENCES polls(id) ON DELETE CASCADE,
     tag_id TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
