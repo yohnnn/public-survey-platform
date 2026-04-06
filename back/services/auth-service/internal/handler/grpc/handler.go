@@ -4,7 +4,7 @@ import (
 	"context"
 
 	authv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/auth/v1"
-	grpcinterceptors "github.com/yohnnn/public-survey-platform/back/services/auth-service/internal/handler/grpc/interceptors"
+	"github.com/yohnnn/public-survey-platform/back/pkg/grpcinterceptor"
 	"github.com/yohnnn/public-survey-platform/back/services/auth-service/internal/models"
 	"github.com/yohnnn/public-survey-platform/back/services/auth-service/internal/service"
 )
@@ -61,7 +61,7 @@ func (h *Handler) Logout(ctx context.Context, req *authv1.LogoutRequest) (*authv
 }
 
 func (h *Handler) LogoutAll(ctx context.Context, _ *authv1.LogoutAllRequest) (*authv1.LogoutAllResponse, error) {
-	userID, ok := grpcinterceptors.UserIDFromContext(ctx)
+	userID, ok := grpcinterceptor.UserIDFromContext(ctx)
 	if !ok || userID == "" {
 		return nil, toStatusError(models.ErrUnauthorized)
 	}
@@ -83,7 +83,7 @@ func (h *Handler) ValidateToken(ctx context.Context, req *authv1.ValidateTokenRe
 }
 
 func (h *Handler) GetUser(ctx context.Context, _ *authv1.GetUserRequest) (*authv1.GetUserResponse, error) {
-	userID, ok := grpcinterceptors.UserIDFromContext(ctx)
+	userID, ok := grpcinterceptor.UserIDFromContext(ctx)
 	if !ok || userID == "" {
 		return nil, toStatusError(models.ErrUnauthorized)
 	}

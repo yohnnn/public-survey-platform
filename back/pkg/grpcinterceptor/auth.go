@@ -1,12 +1,9 @@
-package interceptors
+package grpcinterceptor
 
 import (
 	"context"
 	"strings"
 
-	authv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/auth/v1"
-	"github.com/yohnnn/public-survey-platform/back/services/auth-service/internal/models"
-	"github.com/yohnnn/public-survey-platform/back/services/auth-service/internal/service"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -17,18 +14,14 @@ type userIDCtxKey struct{}
 
 func UserIDFromContext(ctx context.Context) (string, bool) {
 	v, ok := ctx.Value(userIDCtxKey{}).(string)
-	if !ok || v == "" {
-		return "", false
-	}
-	return v, true
+	return v, ok
 }
 
-func UnaryAuthInterceptor(svc service.AuthService) grpc.UnaryServerInterceptor {
-	publicMethods := map[string]struct{}{
-		authv1.AuthService_Register_FullMethodName:      {},
-		authv1.AuthService_Login_FullMethodName:         {},
-		authv1.AuthService_RefreshToken_FullMethodName:  {},
-		authv1.AuthService_ValidateToken_FullMethodName: {},
+type TokenValidator func(ctx context.Context, token string) (userID string, err error)
+
+func UnaryAuthInterceptor(validate TokenValidator, publicMethods map[string]struct{}) grpc.UnaryServerInterceptor {
+	if publicMethods == nil {
+		publicMethods = map[string]struct{}{}
 	}
 
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
@@ -41,7 +34,7 @@ func UnaryAuthInterceptor(svc service.AuthService) grpc.UnaryServerInterceptor {
 			return nil, status.Error(codes.Unauthenticated, "missing or invalid bearer token")
 		}
 
-		userID, err := svc.ValidateToken(ctx, token)
+		userID, err := validate(ctx, token)
 		if err != nil {
 			return nil, status.Error(codes.Unauthenticated, "invalid token")
 		}
@@ -54,17 +47,17 @@ func UnaryAuthInterceptor(svc service.AuthService) grpc.UnaryServerInterceptor {
 func extractBearerToken(ctx context.Context) (string, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
-		return "", models.ErrUnauthorized
+		return "", status.Error(codes.Unauthenticated, "missing metadata")
 	}
 
 	values := md.Get("authorization")
 	if len(values) == 0 {
-		return "", models.ErrUnauthorized
+		return "", status.Error(codes.Unauthenticated, "missing authorization")
 	}
 
 	token := parseBearer(values[0])
 	if token == "" {
-		return "", models.ErrUnauthorized
+		return "", status.Error(codes.Unauthenticated, "invalid authorization")
 	}
 
 	return token, nil

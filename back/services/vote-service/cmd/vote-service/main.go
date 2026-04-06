@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"os"
@@ -18,11 +19,11 @@ import (
 	authv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/auth/v1"
 	pollv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/poll/v1"
 	votev1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/vote/v1"
+	"github.com/yohnnn/public-survey-platform/back/pkg/grpcinterceptor"
 	"github.com/yohnnn/public-survey-platform/back/pkg/outbox"
 	"github.com/yohnnn/public-survey-platform/back/pkg/tx"
 	"github.com/yohnnn/public-survey-platform/back/services/vote-service/internal/config"
 	grpcHandler "github.com/yohnnn/public-survey-platform/back/services/vote-service/internal/handler/grpc"
-	grpcinterceptors "github.com/yohnnn/public-survey-platform/back/services/vote-service/internal/handler/grpc/interceptors"
 	"github.com/yohnnn/public-survey-platform/back/services/vote-service/internal/repository/postgres"
 	"github.com/yohnnn/public-survey-platform/back/services/vote-service/internal/service"
 )
@@ -88,8 +89,20 @@ func main() {
 		}
 	}()
 
-	authInterceptor := grpcinterceptors.UnaryAuthInterceptor(authClient)
-	loggingInterceptor := grpcinterceptors.UnaryLoggingInterceptor(logger)
+	authInterceptor := grpcinterceptor.UnaryAuthInterceptor(
+		func(ctx context.Context, token string) (string, error) {
+			resp, err := authClient.ValidateToken(ctx, &authv1.ValidateTokenRequest{AccessToken: token})
+			if err != nil {
+				return "", err
+			}
+			if !resp.GetValid() {
+				return "", fmt.Errorf("token is not valid")
+			}
+			return resp.GetUserId(), nil
+		},
+		nil,
+	)
+	loggingInterceptor := grpcinterceptor.UnaryLoggingInterceptor(logger)
 
 	srv := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(loggingInterceptor, authInterceptor),

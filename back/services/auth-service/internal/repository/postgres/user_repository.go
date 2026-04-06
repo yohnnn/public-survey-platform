@@ -60,7 +60,7 @@ func (r *UserRepository) Create(ctx context.Context, user models.User) (models.U
 
 func (r *UserRepository) GetByID(ctx context.Context, id string) (models.User, error) {
 	const query = `
-		SELECT id, email, password_hash, country, gender, birth_year, created_at
+		SELECT id, email, country, gender, birth_year, created_at
 		FROM users
 		WHERE id = $1
 	`
@@ -70,7 +70,6 @@ func (r *UserRepository) GetByID(ctx context.Context, id string) (models.User, e
 	err := exec.QueryRow(ctx, query, id).Scan(
 		&out.ID,
 		&out.Email,
-		&out.PasswordHash,
 		&out.Country,
 		&out.Gender,
 		&out.BirthYear,

@@ -5,7 +5,7 @@ import (
 	"time"
 
 	pollv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/poll/v1"
-	grpcinterceptors "github.com/yohnnn/public-survey-platform/back/services/poll-service/internal/handler/grpc/interceptors"
+	"github.com/yohnnn/public-survey-platform/back/pkg/grpcinterceptor"
 	"github.com/yohnnn/public-survey-platform/back/services/poll-service/internal/models"
 	"github.com/yohnnn/public-survey-platform/back/services/poll-service/internal/service"
 )
@@ -20,7 +20,7 @@ func NewHandler(svc service.PollService) *Handler {
 }
 
 func (h *Handler) CreatePoll(ctx context.Context, req *pollv1.CreatePollRequest) (*pollv1.CreatePollResponse, error) {
-	userID, ok := grpcinterceptors.UserIDFromContext(ctx)
+	userID, ok := grpcinterceptor.UserIDFromContext(ctx)
 	if !ok || userID == "" {
 		return nil, toStatusError(models.ErrUnauthorized)
 	}
@@ -70,7 +70,7 @@ func (h *Handler) ListPolls(ctx context.Context, req *pollv1.ListPollsRequest) (
 }
 
 func (h *Handler) UpdatePoll(ctx context.Context, req *pollv1.UpdatePollRequest) (*pollv1.UpdatePollResponse, error) {
-	userID, ok := grpcinterceptors.UserIDFromContext(ctx)
+	userID, ok := grpcinterceptor.UserIDFromContext(ctx)
 	if !ok || userID == "" {
 		return nil, toStatusError(models.ErrUnauthorized)
 	}
@@ -114,7 +114,7 @@ func (h *Handler) UpdatePoll(ctx context.Context, req *pollv1.UpdatePollRequest)
 }
 
 func (h *Handler) DeletePoll(ctx context.Context, req *pollv1.DeletePollRequest) (*pollv1.DeletePollResponse, error) {
-	userID, ok := grpcinterceptors.UserIDFromContext(ctx)
+	userID, ok := grpcinterceptor.UserIDFromContext(ctx)
 	if !ok || userID == "" {
 		return nil, toStatusError(models.ErrUnauthorized)
 	}
@@ -127,7 +127,7 @@ func (h *Handler) DeletePoll(ctx context.Context, req *pollv1.DeletePollRequest)
 }
 
 func (h *Handler) CreateTag(ctx context.Context, req *pollv1.CreateTagRequest) (*pollv1.CreateTagResponse, error) {
-	userID, ok := grpcinterceptors.UserIDFromContext(ctx)
+	userID, ok := grpcinterceptor.UserIDFromContext(ctx)
 	if !ok || userID == "" {
 		return nil, toStatusError(models.ErrUnauthorized)
 	}

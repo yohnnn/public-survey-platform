@@ -11,10 +11,10 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	authv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/auth/v1"
+	"github.com/yohnnn/public-survey-platform/back/pkg/grpcinterceptor"
 	"github.com/yohnnn/public-survey-platform/back/pkg/tx"
 	"github.com/yohnnn/public-survey-platform/back/services/auth-service/internal/config"
 	handlergrpc "github.com/yohnnn/public-survey-platform/back/services/auth-service/internal/handler/grpc"
-	"github.com/yohnnn/public-survey-platform/back/services/auth-service/internal/handler/grpc/interceptors"
 	"github.com/yohnnn/public-survey-platform/back/services/auth-service/internal/repository/postgres"
 	"github.com/yohnnn/public-survey-platform/back/services/auth-service/internal/security"
 	"github.com/yohnnn/public-survey-platform/back/services/auth-service/internal/service"
@@ -63,8 +63,13 @@ func main() {
 
 	grpcServer := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
-			interceptors.UnaryLoggingInterceptor(logger),
-			interceptors.UnaryAuthInterceptor(authService),
+			grpcinterceptor.UnaryLoggingInterceptor(logger),
+			grpcinterceptor.UnaryAuthInterceptor(authService.ValidateToken, map[string]struct{}{
+				authv1.AuthService_Register_FullMethodName:      {},
+				authv1.AuthService_Login_FullMethodName:         {},
+				authv1.AuthService_RefreshToken_FullMethodName:  {},
+				authv1.AuthService_ValidateToken_FullMethodName: {},
+			}),
 		),
 	)
 	authv1.RegisterAuthServiceServer(grpcServer, handler)

@@ -4,7 +4,7 @@ import (
 	"context"
 
 	votev1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/vote/v1"
-	grpcinterceptors "github.com/yohnnn/public-survey-platform/back/services/vote-service/internal/handler/grpc/interceptors"
+	"github.com/yohnnn/public-survey-platform/back/pkg/grpcinterceptor"
 	"github.com/yohnnn/public-survey-platform/back/services/vote-service/internal/models"
 	"github.com/yohnnn/public-survey-platform/back/services/vote-service/internal/service"
 )
@@ -19,7 +19,7 @@ func NewHandler(svc service.VoteService) *Handler {
 }
 
 func (h *Handler) Vote(ctx context.Context, req *votev1.VoteRequest) (*votev1.VoteResponse, error) {
-	userID, ok := grpcinterceptors.UserIDFromContext(ctx)
+	userID, ok := grpcinterceptor.UserIDFromContext(ctx)
 	if !ok || userID == "" {
 		return nil, toStatusError(models.ErrUnauthorized)
 	}
@@ -33,7 +33,7 @@ func (h *Handler) Vote(ctx context.Context, req *votev1.VoteRequest) (*votev1.Vo
 }
 
 func (h *Handler) RemoveVote(ctx context.Context, req *votev1.RemoveVoteRequest) (*votev1.RemoveVoteResponse, error) {
-	userID, ok := grpcinterceptors.UserIDFromContext(ctx)
+	userID, ok := grpcinterceptor.UserIDFromContext(ctx)
 	if !ok || userID == "" {
 		return nil, toStatusError(models.ErrUnauthorized)
 	}
@@ -46,7 +46,7 @@ func (h *Handler) RemoveVote(ctx context.Context, req *votev1.RemoveVoteRequest)
 }
 
 func (h *Handler) GetUserVote(ctx context.Context, req *votev1.GetUserVoteRequest) (*votev1.GetUserVoteResponse, error) {
-	userID, ok := grpcinterceptors.UserIDFromContext(ctx)
+	userID, ok := grpcinterceptor.UserIDFromContext(ctx)
 	if !ok || userID == "" {
 		return nil, toStatusError(models.ErrUnauthorized)
 	}
