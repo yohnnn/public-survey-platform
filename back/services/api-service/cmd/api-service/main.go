@@ -12,6 +12,7 @@ import (
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	authv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/auth/v1"
+	feedv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/feed/v1"
 	pollv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/poll/v1"
 	votev1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/vote/v1"
 	"github.com/yohnnn/public-survey-platform/back/services/api-service/internal/config"
@@ -58,6 +59,9 @@ func main() {
 	}
 	if err := votev1.RegisterVoteServiceHandlerFromEndpoint(ctx, mux, cfg.VoteGRPCEndpoint, dialOptions); err != nil {
 		logger.Fatalf("register vote gateway handlers: %v", err)
+	}
+	if err := feedv1.RegisterFeedServiceHandlerFromEndpoint(ctx, mux, cfg.FeedGRPCEndpoint, dialOptions); err != nil {
+		logger.Fatalf("register feed gateway handlers: %v", err)
 	}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

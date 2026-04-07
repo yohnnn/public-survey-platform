@@ -11,6 +11,7 @@ type Config struct {
 	AuthGRPCEndpoint string
 	PollGRPCEndpoint string
 	VoteGRPCEndpoint string
+	FeedGRPCEndpoint string
 }
 
 func Load() (Config, error) {
@@ -19,6 +20,7 @@ func Load() (Config, error) {
 		AuthGRPCEndpoint: strings.TrimSpace(getEnv("AUTH_GRPC_ENDPOINT", "")),
 		PollGRPCEndpoint: strings.TrimSpace(getEnv("POLL_GRPC_ENDPOINT", "")),
 		VoteGRPCEndpoint: strings.TrimSpace(getEnv("VOTE_GRPC_ENDPOINT", "")),
+		FeedGRPCEndpoint: strings.TrimSpace(getEnv("FEED_GRPC_ENDPOINT", "")),
 	}
 
 	if cfg.AuthGRPCEndpoint == "" {
@@ -29,6 +31,9 @@ func Load() (Config, error) {
 	}
 	if cfg.VoteGRPCEndpoint == "" {
 		return Config{}, fmt.Errorf("VOTE_GRPC_ENDPOINT is required")
+	}
+	if cfg.FeedGRPCEndpoint == "" {
+		return Config{}, fmt.Errorf("FEED_GRPC_ENDPOINT is required")
 	}
 
 	return cfg, nil

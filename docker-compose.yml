@@ -221,6 +221,60 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
+  feed-postgres:
+    image: postgres:16-alpine
+    container_name: psp-feed-postgres
+    environment:
+      POSTGRES_DB: feed_service
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5436:5432"
+    volumes:
+      - feed_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d feed_service"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  feed-migrate:
+    image: migrate/migrate:v4.18.3
+    container_name: psp-feed-migrate
+    volumes:
+      - ./back/services/feed-service/migrations:/migrations
+    depends_on:
+      feed-postgres:
+        condition: service_healthy
+    command:
+      - -path=/migrations
+      - -database=postgres://postgres:postgres@feed-postgres:5432/feed_service?sslmode=disable
+      - up
+    restart: "no"
+
+  feed-service:
+    container_name: psp-feed-service
+    build:
+      context: ./back
+      dockerfile: services/feed-service/Dockerfile
+    env_file:
+      - ./back/services/feed-service/.env
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@feed-postgres:5432/feed_service?sslmode=disable
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_TOPIC_PREFIX: ""
+      KAFKA_GROUP_ID: feed-service
+    ports:
+      - "50054:50054"
+    depends_on:
+      feed-postgres:
+        condition: service_healthy
+      feed-migrate:
+        condition: service_completed_successfully
+      kafka-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
   api-service:
     container_name: psp-api-service
     build:
@@ -232,15 +286,18 @@ services:
       AUTH_GRPC_ENDPOINT: auth-service:50051
       POLL_GRPC_ENDPOINT: poll-service:50052
       VOTE_GRPC_ENDPOINT: vote-service:50053
+      FEED_GRPC_ENDPOINT: feed-service:50054
     ports:
       - "8080:8080"
     depends_on:
       - auth-service
       - poll-service
       - vote-service
+      - feed-service
     restart: unless-stopped
 
 volumes:
   auth_postgres_data:
   poll_postgres_data:
   vote_postgres_data:
+  feed_postgres_data:
