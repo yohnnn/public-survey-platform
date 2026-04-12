@@ -6,6 +6,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/jackc/pgx/v5 v5.9.0
 	github.com/yohnnn/public-survey-platform/back v0.0.0
+	go.uber.org/mock v0.6.0
 	golang.org/x/crypto v0.49.0
 	google.golang.org/grpc v1.79.3
 	google.golang.org/protobuf v1.36.11

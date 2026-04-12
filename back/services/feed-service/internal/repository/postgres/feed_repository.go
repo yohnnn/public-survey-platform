@@ -63,6 +63,53 @@ func (r *FeedRepository) CreateFeedItem(ctx context.Context, item models.FeedIte
 	return nil
 }
 
+func (r *FeedRepository) UpdateFeedItem(ctx context.Context, item models.FeedItem, tags []string) error {
+	const updateFeedItemQuery = `
+		UPDATE feed_items
+		SET question = $2
+		WHERE id = $1
+	`
+
+	feedItemID := strings.TrimSpace(item.ID)
+	exec := tx.Executor(ctx, r.pool)
+	if _, err := exec.Exec(ctx, updateFeedItemQuery, feedItemID, strings.TrimSpace(item.Question)); err != nil {
+		return err
+	}
+
+	if _, err := exec.Exec(ctx, `DELETE FROM feed_item_tags WHERE feed_item_id = $1`, feedItemID); err != nil {
+		return err
+	}
+
+	if len(tags) == 0 {
+		return nil
+	}
+
+	const insertTagQuery = `
+		INSERT INTO feed_item_tags (feed_item_id, tag)
+		VALUES ($1, $2)
+		ON CONFLICT DO NOTHING
+	`
+	for _, tag := range tags {
+		tag = strings.TrimSpace(tag)
+		if tag == "" {
+			continue
+		}
+		if _, err := exec.Exec(ctx, insertTagQuery, feedItemID, tag); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (r *FeedRepository) DeleteFeedItem(ctx context.Context, feedItemID string) error {
+	const query = `DELETE FROM feed_items WHERE id = $1`
+
+	exec := tx.Executor(ctx, r.pool)
+	_, err := exec.Exec(ctx, query, strings.TrimSpace(feedItemID))
+	return err
+}
+
 func (r *FeedRepository) IncrementOptionVotes(ctx context.Context, optionID string, delta int64) error {
 	const query = `
 		UPDATE feed_item_options
@@ -78,13 +125,34 @@ func (r *FeedRepository) IncrementOptionVotes(ctx context.Context, optionID stri
 func (r *FeedRepository) UpdateTotalVotes(ctx context.Context, feedItemID string, delta int64) error {
 	const query = `
 		UPDATE feed_items
-		SET total_votes = total_votes + $1
+		SET total_votes = GREATEST(0, total_votes + $1)
 		WHERE id = $2
 	`
 
 	exec := tx.Executor(ctx, r.pool)
 	_, err := exec.Exec(ctx, query, delta, feedItemID)
 	return err
+}
+
+func (r *FeedRepository) MarkEventProcessed(ctx context.Context, eventID, topic string) (bool, error) {
+	eventID = strings.TrimSpace(eventID)
+	if eventID == "" {
+		return true, nil
+	}
+
+	const query = `
+		INSERT INTO processed_events (event_id, topic)
+		VALUES ($1, $2)
+		ON CONFLICT (event_id) DO NOTHING
+	`
+
+	exec := tx.Executor(ctx, r.pool)
+	cmd, err := exec.Exec(ctx, query, eventID, strings.TrimSpace(topic))
+	if err != nil {
+		return false, err
+	}
+
+	return cmd.RowsAffected() == 1, nil
 }
 
 func (r *FeedRepository) GetFeed(ctx context.Context, filter repository.FeedListFilter) ([]models.FeedItem, error) {
@@ -300,4 +368,3 @@ func (r *FeedRepository) GetTagsByFeedItemIDs(ctx context.Context, feedItemIDs [
 
 	return out, nil
 }
-

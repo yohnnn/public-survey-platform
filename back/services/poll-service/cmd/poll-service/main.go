@@ -15,14 +15,15 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
-	"github.com/yohnnn/public-survey-platform/back/api/events"
 	authv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/auth/v1"
 	pollv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/poll/v1"
+	"github.com/yohnnn/public-survey-platform/back/pkg/events"
 	"github.com/yohnnn/public-survey-platform/back/pkg/grpcinterceptor"
 	"github.com/yohnnn/public-survey-platform/back/pkg/outbox"
 	"github.com/yohnnn/public-survey-platform/back/pkg/tx"
 	"github.com/yohnnn/public-survey-platform/back/services/poll-service/internal/config"
 	grpcHandler "github.com/yohnnn/public-survey-platform/back/services/poll-service/internal/handler/grpc"
+	pollkafka "github.com/yohnnn/public-survey-platform/back/services/poll-service/internal/messaging/kafka"
 	"github.com/yohnnn/public-survey-platform/back/services/poll-service/internal/repository/postgres"
 	"github.com/yohnnn/public-survey-platform/back/services/poll-service/internal/service"
 )
@@ -80,9 +81,27 @@ func main() {
 
 	outboxRelay := outbox.NewRelay(outboxRepo, publisher, outbox.NewSystemClock(), logger, cfg.OutboxInterval, cfg.OutboxBatchSize)
 
+	subscriber, err := events.NewKafkaSubscriber(events.KafkaSubscriberConfig{
+		Brokers:      cfg.KafkaBrokers,
+		GroupID:      cfg.KafkaGroupID,
+		TopicPrefix:  cfg.KafkaTopicPrefix,
+		ReadTimeout:  cfg.KafkaReadTimeout,
+		CommitPeriod: cfg.KafkaCommitPeriod,
+	})
+	if err != nil {
+		logger.Fatalf("create kafka subscriber: %v", err)
+	}
+
+	voteConsumer := pollkafka.NewPollConsumer(subscriber, pollRepo, txMgr, logger)
+
 	go func() {
 		if runErr := outboxRelay.Run(ctx); runErr != nil && !errors.Is(runErr, context.Canceled) {
 			logger.Printf("outbox relay stopped: %v", runErr)
+		}
+	}()
+	go func() {
+		if runErr := voteConsumer.Run(ctx); runErr != nil && !errors.Is(runErr, context.Canceled) {
+			logger.Printf("vote consumer stopped: %v", runErr)
 		}
 	}()
 

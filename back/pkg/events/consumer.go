@@ -46,10 +46,33 @@ func (c *Consumer) Run(ctx context.Context) error {
 	}
 
 	return c.subscriber.Subscribe(ctx, topics, func(msgCtx context.Context, msg Message) error {
-		handler, ok := c.handlers[msg.Topic]
+		handler, ok := c.resolveHandler(msg.Topic)
 		if !ok {
 			return fmt.Errorf("no handler for topic %q", msg.Topic)
 		}
 		return handler(msgCtx, msg)
 	})
+}
+
+func (c *Consumer) resolveHandler(topic string) (HandlerFunc, bool) {
+	topic = strings.TrimSpace(topic)
+	if topic == "" {
+		return nil, false
+	}
+
+	if handler, ok := c.handlers[topic]; ok {
+		return handler, true
+	}
+
+	for expectedTopic, handler := range c.handlers {
+		expectedTopic = strings.TrimSpace(expectedTopic)
+		if expectedTopic == "" {
+			continue
+		}
+		if strings.HasSuffix(topic, "."+expectedTopic) {
+			return handler, true
+		}
+	}
+
+	return nil, false
 }

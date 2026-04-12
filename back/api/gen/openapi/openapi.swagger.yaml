@@ -1,0 +1,1063 @@
+swagger: "2.0"
+info:
+  title: analytics/v1/analytics.proto
+  version: version not set
+tags:
+  - name: AnalyticsService
+  - name: AuthService
+  - name: FeedService
+  - name: PollService
+  - name: RealtimeService
+  - name: VoteService
+consumes:
+  - application/json
+produces:
+  - application/json
+paths:
+  /v1/auth/login:
+    post:
+      operationId: AuthService_Login
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1LoginResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: body
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/v1LoginRequest'
+      tags:
+        - AuthService
+  /v1/auth/logout:
+    post:
+      operationId: AuthService_Logout
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1LogoutResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: body
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/v1LogoutRequest'
+      tags:
+        - AuthService
+  /v1/auth/logout-all:
+    post:
+      operationId: AuthService_LogoutAll
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1LogoutAllResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: body
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/v1LogoutAllRequest'
+      tags:
+        - AuthService
+  /v1/auth/me:
+    get:
+      operationId: AuthService_GetUser
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1GetUserResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      tags:
+        - AuthService
+  /v1/auth/refresh:
+    post:
+      operationId: AuthService_RefreshToken
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1RefreshTokenResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: body
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/v1RefreshTokenRequest'
+      tags:
+        - AuthService
+  /v1/auth/register:
+    post:
+      operationId: AuthService_Register
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1RegisterResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: body
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/v1RegisterRequest'
+      tags:
+        - AuthService
+  /v1/feed:
+    get:
+      operationId: FeedService_GetFeed
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1GetFeedResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          type: string
+        - name: limit
+          in: query
+          required: false
+          type: integer
+          format: int64
+        - name: sort
+          in: query
+          required: false
+          type: string
+        - name: tags
+          in: query
+          required: false
+          type: array
+          items:
+            type: string
+          collectionFormat: multi
+      tags:
+        - FeedService
+  /v1/feed/trending:
+    get:
+      operationId: FeedService_GetTrending
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1GetTrendingResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          type: string
+        - name: limit
+          in: query
+          required: false
+          type: integer
+          format: int64
+      tags:
+        - FeedService
+  /v1/feed/user/{userId}:
+    get:
+      operationId: FeedService_GetUserPolls
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1GetUserPollsResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          type: string
+        - name: cursor
+          in: query
+          required: false
+          type: string
+        - name: limit
+          in: query
+          required: false
+          type: integer
+          format: int64
+      tags:
+        - FeedService
+  /v1/polls:
+    get:
+      operationId: PollService_ListPolls
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1ListPollsResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          type: string
+        - name: limit
+          in: query
+          required: false
+          type: integer
+          format: int64
+        - name: tags
+          in: query
+          required: false
+          type: array
+          items:
+            type: string
+          collectionFormat: multi
+      tags:
+        - PollService
+    post:
+      operationId: PollService_CreatePoll
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1CreatePollResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: body
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/v1CreatePollRequest'
+      tags:
+        - PollService
+  /v1/polls/{id}:
+    get:
+      operationId: PollService_GetPoll
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1GetPollResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+      tags:
+        - PollService
+    delete:
+      operationId: PollService_DeletePoll
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1DeletePollResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+      tags:
+        - PollService
+    patch:
+      operationId: PollService_UpdatePoll
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1UpdatePollResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+        - name: body
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/PollServiceUpdatePollBody'
+      tags:
+        - PollService
+  /v1/polls/{pollId}/analytics:
+    get:
+      operationId: AnalyticsService_GetPollAnalytics
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1GetPollAnalyticsResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: pollId
+          in: path
+          required: true
+          type: string
+        - name: from
+          in: query
+          required: false
+          type: string
+          format: date-time
+        - name: to
+          in: query
+          required: false
+          type: string
+          format: date-time
+        - name: interval
+          in: query
+          required: false
+          type: string
+      tags:
+        - AnalyticsService
+  /v1/polls/{pollId}/analytics/age:
+    get:
+      operationId: AnalyticsService_GetAgeStats
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1GetAgeStatsResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: pollId
+          in: path
+          required: true
+          type: string
+        - name: from
+          in: query
+          required: false
+          type: string
+          format: date-time
+        - name: to
+          in: query
+          required: false
+          type: string
+          format: date-time
+        - name: interval
+          in: query
+          required: false
+          type: string
+      tags:
+        - AnalyticsService
+  /v1/polls/{pollId}/analytics/countries:
+    get:
+      operationId: AnalyticsService_GetCountryStats
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1GetCountryStatsResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: pollId
+          in: path
+          required: true
+          type: string
+        - name: from
+          in: query
+          required: false
+          type: string
+          format: date-time
+        - name: to
+          in: query
+          required: false
+          type: string
+          format: date-time
+        - name: interval
+          in: query
+          required: false
+          type: string
+      tags:
+        - AnalyticsService
+  /v1/polls/{pollId}/analytics/gender:
+    get:
+      operationId: AnalyticsService_GetGenderStats
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1GetGenderStatsResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: pollId
+          in: path
+          required: true
+          type: string
+        - name: from
+          in: query
+          required: false
+          type: string
+          format: date-time
+        - name: to
+          in: query
+          required: false
+          type: string
+          format: date-time
+        - name: interval
+          in: query
+          required: false
+          type: string
+      tags:
+        - AnalyticsService
+  /v1/polls/{pollId}/vote:
+    get:
+      operationId: VoteService_GetUserVote
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1GetUserVoteResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: pollId
+          in: path
+          required: true
+          type: string
+      tags:
+        - VoteService
+    delete:
+      operationId: VoteService_RemoveVote
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1RemoveVoteResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: pollId
+          in: path
+          required: true
+          type: string
+      tags:
+        - VoteService
+    post:
+      operationId: VoteService_Vote
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1VoteResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: pollId
+          in: path
+          required: true
+          type: string
+        - name: body
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/VoteServiceVoteBody'
+      tags:
+        - VoteService
+  /v1/realtime/polls/{pollId}/stream:
+    get:
+      operationId: RealtimeService_StreamPollUpdates
+      responses:
+        "200":
+          description: A successful response.(streaming responses)
+          schema:
+            type: object
+            properties:
+              result:
+                $ref: '#/definitions/v1StreamPollUpdatesResponse'
+              error:
+                $ref: '#/definitions/rpcStatus'
+            title: Stream result of v1StreamPollUpdatesResponse
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: pollId
+          in: path
+          required: true
+          type: string
+      tags:
+        - RealtimeService
+  /v1/tags:
+    get:
+      operationId: PollService_ListTags
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1ListTagsResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      tags:
+        - PollService
+    post:
+      operationId: PollService_CreateTag
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1CreateTagResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: body
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/v1CreateTagRequest'
+      tags:
+        - PollService
+  /v1/ws:
+    get:
+      operationId: RealtimeService_WSHandshake
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1WSHandshakeResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      tags:
+        - RealtimeService
+definitions:
+  PollServiceUpdatePollBody:
+    type: object
+    properties:
+      question:
+        type: string
+      isAnonymous:
+        type: boolean
+      endsAt:
+        type: string
+        format: date-time
+      tags:
+        type: array
+        items:
+          type: string
+  VoteServiceVoteBody:
+    type: object
+    properties:
+      optionIds:
+        type: array
+        items:
+          type: string
+  protobufAny:
+    type: object
+    properties:
+      '@type':
+        type: string
+    additionalProperties: {}
+  rpcStatus:
+    type: object
+    properties:
+      code:
+        type: integer
+        format: int32
+      message:
+        type: string
+      details:
+        type: array
+        items:
+          type: object
+          $ref: '#/definitions/protobufAny'
+  v1AgeStat:
+    type: object
+    properties:
+      ageRange:
+        type: string
+      votes:
+        type: string
+        format: int64
+  v1AuthTokens:
+    type: object
+    properties:
+      accessToken:
+        type: string
+      refreshToken:
+        type: string
+      expiresInSeconds:
+        type: string
+        format: int64
+  v1CountryStat:
+    type: object
+    properties:
+      country:
+        type: string
+      votes:
+        type: string
+        format: int64
+  v1CreatePollRequest:
+    type: object
+    properties:
+      question:
+        type: string
+      type:
+        $ref: '#/definitions/v1PollType'
+      isAnonymous:
+        type: boolean
+      endsAt:
+        type: string
+        format: date-time
+      options:
+        type: array
+        items:
+          type: string
+      tags:
+        type: array
+        items:
+          type: string
+  v1CreatePollResponse:
+    type: object
+    properties:
+      poll:
+        $ref: '#/definitions/v1Poll'
+  v1CreateTagRequest:
+    type: object
+    properties:
+      name:
+        type: string
+  v1CreateTagResponse:
+    type: object
+    properties:
+      tag:
+        $ref: '#/definitions/v1Tag'
+  v1CursorPageMeta:
+    type: object
+    properties:
+      nextCursor:
+        type: string
+      hasMore:
+        type: boolean
+      limit:
+        type: integer
+        format: int64
+  v1DeletePollResponse:
+    type: object
+    properties:
+      success:
+        type: boolean
+  v1FeedItem:
+    type: object
+    properties:
+      id:
+        type: string
+      question:
+        type: string
+      totalVotes:
+        type: string
+        format: int64
+      options:
+        type: array
+        items:
+          type: object
+          $ref: '#/definitions/v1FeedOption'
+      tags:
+        type: array
+        items:
+          type: string
+      createdAt:
+        type: string
+        format: date-time
+  v1FeedOption:
+    type: object
+    properties:
+      id:
+        type: string
+      text:
+        type: string
+      votesCount:
+        type: string
+        format: int64
+  v1GenderStat:
+    type: object
+    properties:
+      gender:
+        type: string
+      votes:
+        type: string
+        format: int64
+  v1GetAgeStatsResponse:
+    type: object
+    properties:
+      pollId:
+        type: string
+      items:
+        type: array
+        items:
+          type: object
+          $ref: '#/definitions/v1AgeStat'
+  v1GetCountryStatsResponse:
+    type: object
+    properties:
+      pollId:
+        type: string
+      items:
+        type: array
+        items:
+          type: object
+          $ref: '#/definitions/v1CountryStat'
+  v1GetFeedResponse:
+    type: object
+    properties:
+      items:
+        type: array
+        items:
+          type: object
+          $ref: '#/definitions/v1FeedItem'
+      page:
+        $ref: '#/definitions/v1CursorPageMeta'
+  v1GetGenderStatsResponse:
+    type: object
+    properties:
+      pollId:
+        type: string
+      items:
+        type: array
+        items:
+          type: object
+          $ref: '#/definitions/v1GenderStat'
+  v1GetPollAnalyticsResponse:
+    type: object
+    properties:
+      pollId:
+        type: string
+      totalVotes:
+        type: string
+        format: int64
+      options:
+        type: array
+        items:
+          type: object
+          $ref: '#/definitions/v1OptionStat'
+      countries:
+        type: array
+        items:
+          type: object
+          $ref: '#/definitions/v1CountryStat'
+      gender:
+        type: array
+        items:
+          type: object
+          $ref: '#/definitions/v1GenderStat'
+      age:
+        type: array
+        items:
+          type: object
+          $ref: '#/definitions/v1AgeStat'
+  v1GetPollResponse:
+    type: object
+    properties:
+      poll:
+        $ref: '#/definitions/v1Poll'
+  v1GetTrendingResponse:
+    type: object
+    properties:
+      items:
+        type: array
+        items:
+          type: object
+          $ref: '#/definitions/v1FeedItem'
+      page:
+        $ref: '#/definitions/v1CursorPageMeta'
+  v1GetUserPollsResponse:
+    type: object
+    properties:
+      items:
+        type: array
+        items:
+          type: object
+          $ref: '#/definitions/v1FeedItem'
+      page:
+        $ref: '#/definitions/v1CursorPageMeta'
+  v1GetUserResponse:
+    type: object
+    properties:
+      user:
+        $ref: '#/definitions/v1User'
+  v1GetUserVoteResponse:
+    type: object
+    properties:
+      pollId:
+        type: string
+      hasVoted:
+        type: boolean
+      optionIds:
+        type: array
+        items:
+          type: string
+      votedAt:
+        type: string
+        format: date-time
+  v1ListPollsResponse:
+    type: object
+    properties:
+      items:
+        type: array
+        items:
+          type: object
+          $ref: '#/definitions/v1Poll'
+      nextCursor:
+        type: string
+      hasMore:
+        type: boolean
+  v1ListTagsResponse:
+    type: object
+    properties:
+      items:
+        type: array
+        items:
+          type: object
+          $ref: '#/definitions/v1Tag'
+  v1LoginRequest:
+    type: object
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+  v1LoginResponse:
+    type: object
+    properties:
+      tokens:
+        $ref: '#/definitions/v1AuthTokens'
+  v1LogoutAllRequest:
+    type: object
+  v1LogoutAllResponse:
+    type: object
+    properties:
+      success:
+        type: boolean
+  v1LogoutRequest:
+    type: object
+    properties:
+      refreshToken:
+        type: string
+  v1LogoutResponse:
+    type: object
+    properties:
+      success:
+        type: boolean
+  v1OptionStat:
+    type: object
+    properties:
+      optionId:
+        type: string
+      votes:
+        type: string
+        format: int64
+  v1Poll:
+    type: object
+    properties:
+      id:
+        type: string
+      creatorId:
+        type: string
+      question:
+        type: string
+      type:
+        $ref: '#/definitions/v1PollType'
+      isAnonymous:
+        type: boolean
+      endsAt:
+        type: string
+        format: date-time
+      createdAt:
+        type: string
+        format: date-time
+      totalVotes:
+        type: string
+        format: int64
+      options:
+        type: array
+        items:
+          type: object
+          $ref: '#/definitions/v1PollOption'
+      tags:
+        type: array
+        items:
+          type: string
+  v1PollOption:
+    type: object
+    properties:
+      id:
+        type: string
+      text:
+        type: string
+      votesCount:
+        type: string
+        format: int64
+  v1PollType:
+    type: string
+    enum:
+      - POLL_TYPE_UNSPECIFIED
+      - POLL_TYPE_SINGLE_CHOICE
+      - POLL_TYPE_MULTIPLE_CHOICE
+    default: POLL_TYPE_UNSPECIFIED
+  v1RefreshTokenRequest:
+    type: object
+    properties:
+      refreshToken:
+        type: string
+  v1RefreshTokenResponse:
+    type: object
+    properties:
+      tokens:
+        $ref: '#/definitions/v1AuthTokens'
+  v1RegisterRequest:
+    type: object
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+      country:
+        type: string
+      gender:
+        type: string
+      birthYear:
+        type: integer
+        format: int32
+  v1RegisterResponse:
+    type: object
+    properties:
+      tokens:
+        $ref: '#/definitions/v1AuthTokens'
+  v1RemoveVoteResponse:
+    type: object
+    properties:
+      success:
+        type: boolean
+  v1StreamPollUpdatesResponse:
+    type: object
+    properties:
+      event:
+        type: string
+      pollId:
+        type: string
+      optionId:
+        type: string
+      totalVotes:
+        type: string
+        format: int64
+      timestamp:
+        type: string
+        format: date-time
+  v1Tag:
+    type: object
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      createdAt:
+        type: string
+        format: date-time
+  v1UpdatePollResponse:
+    type: object
+    properties:
+      poll:
+        $ref: '#/definitions/v1Poll'
+  v1User:
+    type: object
+    properties:
+      id:
+        type: string
+      email:
+        type: string
+      country:
+        type: string
+      gender:
+        type: string
+      birthYear:
+        type: integer
+        format: int32
+      createdAt:
+        type: string
+        format: date-time
+  v1VoteResponse:
+    type: object
+    properties:
+      pollId:
+        type: string
+      optionIds:
+        type: array
+        items:
+          type: string
+      votedAt:
+        type: string
+        format: date-time
+  v1WSHandshakeResponse:
+    type: object
+    properties:
+      connectionId:
+        type: string

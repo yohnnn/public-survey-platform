@@ -27,6 +27,9 @@ type PollRepository interface {
 	List(ctx context.Context, filter PollListFilter) ([]models.Poll, error)
 	UpdateByIDAndCreator(ctx context.Context, pollID, creatorID string, patch PollPatch) error
 	DeleteByIDAndCreator(ctx context.Context, pollID, creatorID string) error
+	IncrementOptionVotes(ctx context.Context, pollID, optionID string, delta int64) error
+	UpdateTotalVotes(ctx context.Context, pollID string, delta int64) error
+	MarkEventProcessed(ctx context.Context, eventID, topic string) (bool, error)
 	ReplaceTags(ctx context.Context, pollID string, tagIDs []string) error
 	GetOptionsByPollIDs(ctx context.Context, pollIDs []string) (map[string][]models.PollOption, error)
 	GetTagsByPollIDs(ctx context.Context, pollIDs []string) (map[string][]string, error)

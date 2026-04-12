@@ -12,3 +12,9 @@ plugins:
     out: gen/go
     opt:
       - paths=source_relative
+  - remote: buf.build/grpc-ecosystem/openapiv2
+    out: gen/openapi
+    opt:
+      - allow_merge=true
+      - merge_file_name=openapi
+      - output_format=yaml

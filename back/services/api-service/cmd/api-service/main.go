@@ -11,9 +11,11 @@ import (
 	"time"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	analyticsv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/analytics/v1"
 	authv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/auth/v1"
 	feedv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/feed/v1"
 	pollv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/poll/v1"
+	realtimev1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/realtime/v1"
 	votev1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/vote/v1"
 	"github.com/yohnnn/public-survey-platform/back/services/api-service/internal/config"
 	"google.golang.org/grpc"
@@ -63,8 +65,14 @@ func main() {
 	if err := feedv1.RegisterFeedServiceHandlerFromEndpoint(ctx, mux, cfg.FeedGRPCEndpoint, dialOptions); err != nil {
 		logger.Fatalf("register feed gateway handlers: %v", err)
 	}
+	if err := analyticsv1.RegisterAnalyticsServiceHandlerFromEndpoint(ctx, mux, cfg.AnalyticsGRPCEndpoint, dialOptions); err != nil {
+		logger.Fatalf("register analytics gateway handlers: %v", err)
+	}
+	if err := realtimev1.RegisterRealtimeServiceHandlerFromEndpoint(ctx, mux, cfg.RealtimeGRPCEndpoint, dialOptions); err != nil {
+		logger.Fatalf("register realtime gateway handlers: %v", err)
+	}
 
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && r.URL.Path == "/healthz" {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte("ok"))
@@ -72,6 +80,7 @@ func main() {
 		}
 		mux.ServeHTTP(w, r)
 	})
+	handler = corsMiddleware(newOriginPolicy(cfg.AllowedOrigins), handler)
 
 	httpServer := &http.Server{
 		Addr:              cfg.HTTPAddr,
@@ -97,4 +106,67 @@ func main() {
 			logger.Fatalf("http serve: %v", serveErr)
 		}
 	}
+}
+
+type originPolicy struct {
+	allowAll bool
+	allowed  map[string]struct{}
+}
+
+func newOriginPolicy(origins []string) originPolicy {
+	policy := originPolicy{allowed: make(map[string]struct{}, len(origins))}
+	for _, origin := range origins {
+		origin = strings.TrimSpace(origin)
+		if origin == "" {
+			continue
+		}
+		if origin == "*" {
+			policy.allowAll = true
+			continue
+		}
+		policy.allowed[origin] = struct{}{}
+	}
+	return policy
+}
+
+func (p originPolicy) Allow(origin string) bool {
+	origin = strings.TrimSpace(origin)
+	if origin == "" {
+		return true
+	}
+	if p.allowAll {
+		return true
+	}
+	_, ok := p.allowed[origin]
+	return ok
+}
+
+func corsMiddleware(policy originPolicy, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		origin := strings.TrimSpace(r.Header.Get("Origin"))
+
+		if origin != "" {
+			if !policy.Allow(origin) {
+				http.Error(w, "origin is not allowed", http.StatusForbidden)
+				return
+			}
+
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Vary", "Origin")
+			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Request-Id")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+
+			if strings.EqualFold(strings.TrimSpace(r.Header.Get("Access-Control-Request-Private-Network")), "true") {
+				w.Header().Set("Access-Control-Allow-Private-Network", "true")
+				w.Header().Add("Vary", "Access-Control-Request-Private-Network")
+			}
+		}
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }

@@ -15,10 +15,10 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
-	"github.com/yohnnn/public-survey-platform/back/api/events"
 	authv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/auth/v1"
 	pollv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/poll/v1"
 	votev1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/vote/v1"
+	"github.com/yohnnn/public-survey-platform/back/pkg/events"
 	"github.com/yohnnn/public-survey-platform/back/pkg/grpcinterceptor"
 	"github.com/yohnnn/public-survey-platform/back/pkg/outbox"
 	"github.com/yohnnn/public-survey-platform/back/pkg/tx"
@@ -62,7 +62,7 @@ func main() {
 	voteRepo := postgres.NewVoteRepository(pool)
 	outboxRepo := postgres.NewOutboxRepository(pool)
 	txMgr := tx.NewManager(pool)
-	voteSvc := service.NewVoteService(voteRepo, outboxRepo, pollClient, *txMgr, service.NewSystemClock())
+	voteSvc := service.NewVoteService(voteRepo, outboxRepo, authClient, pollClient, *txMgr, service.NewSystemClock())
 
 	var publisher events.Publisher = events.NewLogPublisher(logger)
 	if cfg.EventPublisher == "kafka" {

@@ -13,12 +13,13 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
-	"github.com/yohnnn/public-survey-platform/back/api/events"
 	feedv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/feed/v1"
+	"github.com/yohnnn/public-survey-platform/back/pkg/events"
 	"github.com/yohnnn/public-survey-platform/back/pkg/grpcinterceptor"
 	"github.com/yohnnn/public-survey-platform/back/pkg/tx"
 	"github.com/yohnnn/public-survey-platform/back/services/feed-service/internal/config"
 	grpcHandler "github.com/yohnnn/public-survey-platform/back/services/feed-service/internal/handler/grpc"
+	feedkafka "github.com/yohnnn/public-survey-platform/back/services/feed-service/internal/messaging/kafka"
 	"github.com/yohnnn/public-survey-platform/back/services/feed-service/internal/repository/postgres"
 	"github.com/yohnnn/public-survey-platform/back/services/feed-service/internal/service"
 )
@@ -55,7 +56,7 @@ func main() {
 		logger.Fatalf("create kafka subscriber: %v", err)
 	}
 
-	consumer := service.NewFeedConsumer(subscriber, feedRepo, txMgr, logger)
+	consumer := feedkafka.NewFeedConsumer(subscriber, feedRepo, txMgr, logger)
 	go func() {
 		if runErr := consumer.Run(ctx); runErr != nil && !errors.Is(runErr, context.Canceled) {
 			logger.Printf("consumer stopped: %v", runErr)

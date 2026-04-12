@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yohnnn/public-survey-platform/back/api/events"
+	"github.com/yohnnn/public-survey-platform/back/pkg/events"
 )
 
 type Event struct {

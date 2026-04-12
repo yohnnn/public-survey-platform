@@ -17,6 +17,9 @@ type Config struct {
 	EventPublisher    string
 	KafkaBrokers      []string
 	KafkaTopicPrefix  string
+	KafkaReadTimeout  time.Duration
+	KafkaCommitPeriod time.Duration
+	KafkaGroupID      string
 	KafkaWriteTimeout time.Duration
 }
 
@@ -30,6 +33,9 @@ func Load() (Config, error) {
 		EventPublisher:    strings.ToLower(strings.TrimSpace(getEnv("EVENT_PUBLISHER", "log"))),
 		KafkaBrokers:      getEnvCSV("KAFKA_BROKERS"),
 		KafkaTopicPrefix:  strings.TrimSpace(getEnv("KAFKA_TOPIC_PREFIX", "")),
+		KafkaReadTimeout:  getEnvDuration("KAFKA_READ_TIMEOUT", 10*time.Second),
+		KafkaCommitPeriod: getEnvDuration("KAFKA_COMMIT_PERIOD", time.Second),
+		KafkaGroupID:      strings.TrimSpace(getEnv("KAFKA_GROUP_ID", "poll-service")),
 		KafkaWriteTimeout: getEnvDuration("KAFKA_WRITE_TIMEOUT", 5*time.Second),
 	}
 
@@ -42,8 +48,11 @@ func Load() (Config, error) {
 	if cfg.EventPublisher != "log" && cfg.EventPublisher != "kafka" {
 		return Config{}, fmt.Errorf("EVENT_PUBLISHER must be one of: log, kafka")
 	}
-	if cfg.EventPublisher == "kafka" && len(cfg.KafkaBrokers) == 0 {
-		return Config{}, fmt.Errorf("KAFKA_BROKERS is required when EVENT_PUBLISHER=kafka")
+	if len(cfg.KafkaBrokers) == 0 {
+		return Config{}, fmt.Errorf("KAFKA_BROKERS is required for poll-service vote event consumer")
+	}
+	if strings.TrimSpace(cfg.KafkaGroupID) == "" {
+		return Config{}, fmt.Errorf("KAFKA_GROUP_ID is required")
 	}
 
 	return cfg, nil

@@ -236,6 +236,51 @@ func (r *PollRepository) DeleteByIDAndCreator(ctx context.Context, pollID, creat
 	return nil
 }
 
+func (r *PollRepository) IncrementOptionVotes(ctx context.Context, pollID, optionID string, delta int64) error {
+	const query = `
+		UPDATE poll_options
+		SET votes_count = GREATEST(0, votes_count + $1)
+		WHERE poll_id = $2 AND id = $3
+	`
+
+	exec := tx.Executor(ctx, r.pool)
+	_, err := exec.Exec(ctx, query, delta, strings.TrimSpace(pollID), strings.TrimSpace(optionID))
+	return err
+}
+
+func (r *PollRepository) UpdateTotalVotes(ctx context.Context, pollID string, delta int64) error {
+	const query = `
+		UPDATE polls
+		SET total_votes = GREATEST(0, total_votes + $1)
+		WHERE id = $2
+	`
+
+	exec := tx.Executor(ctx, r.pool)
+	_, err := exec.Exec(ctx, query, delta, strings.TrimSpace(pollID))
+	return err
+}
+
+func (r *PollRepository) MarkEventProcessed(ctx context.Context, eventID, topic string) (bool, error) {
+	eventID = strings.TrimSpace(eventID)
+	if eventID == "" {
+		return true, nil
+	}
+
+	const query = `
+		INSERT INTO processed_events (event_id, topic)
+		VALUES ($1, $2)
+		ON CONFLICT (event_id) DO NOTHING
+	`
+
+	exec := tx.Executor(ctx, r.pool)
+	cmd, err := exec.Exec(ctx, query, eventID, strings.TrimSpace(topic))
+	if err != nil {
+		return false, err
+	}
+
+	return cmd.RowsAffected() == 1, nil
+}
+
 func (r *PollRepository) ReplaceTags(ctx context.Context, pollID string, tagIDs []string) error {
 	exec := tx.Executor(ctx, r.pool)
 

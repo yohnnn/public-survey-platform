@@ -8,13 +8,13 @@ import (
 )
 
 type Config struct {
-	GRPCAddr         string
-	DatabaseURL      string
-	KafkaBrokers     []string
-	KafkaTopicPrefix string
-	KafkaReadTimeout time.Duration
+	GRPCAddr          string
+	DatabaseURL       string
+	KafkaBrokers      []string
+	KafkaTopicPrefix  string
+	KafkaReadTimeout  time.Duration
 	KafkaCommitPeriod time.Duration
-	KafkaGroupID     string
+	KafkaGroupID      string
 }
 
 func Load() (Config, error) {

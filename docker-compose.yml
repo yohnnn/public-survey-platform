@@ -49,6 +49,8 @@ services:
       - -ec
       - |
         kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic poll.created --replication-factor 1 --partitions 3
+        kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic poll.updated --replication-factor 1 --partitions 3
+        kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic poll.deleted --replication-factor 1 --partitions 3
         kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic vote.cast --replication-factor 1 --partitions 3
         kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic vote.removed --replication-factor 1 --partitions 3
     restart: "no"
@@ -275,6 +277,82 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
+  analytics-postgres:
+    image: postgres:16-alpine
+    container_name: psp-analytics-postgres
+    environment:
+      POSTGRES_DB: analytics_service
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5437:5432"
+    volumes:
+      - analytics_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d analytics_service"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  analytics-migrate:
+    image: migrate/migrate:v4.18.3
+    container_name: psp-analytics-migrate
+    volumes:
+      - ./back/services/analytics-service/migrations:/migrations
+    depends_on:
+      analytics-postgres:
+        condition: service_healthy
+    command:
+      - -path=/migrations
+      - -database=postgres://postgres:postgres@analytics-postgres:5432/analytics_service?sslmode=disable
+      - up
+    restart: "no"
+
+  analytics-service:
+    container_name: psp-analytics-service
+    build:
+      context: ./back
+      dockerfile: services/analytics-service/Dockerfile
+    env_file:
+      - ./back/services/analytics-service/.env
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@analytics-postgres:5432/analytics_service?sslmode=disable
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_TOPIC_PREFIX: ""
+      KAFKA_GROUP_ID: analytics-service
+    ports:
+      - "50055:50055"
+    depends_on:
+      analytics-postgres:
+        condition: service_healthy
+      analytics-migrate:
+        condition: service_completed_successfully
+      kafka-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  realtime-service:
+    container_name: psp-realtime-service
+    build:
+      context: ./back
+      dockerfile: services/realtime-service/Dockerfile
+    env_file:
+      - ./back/services/realtime-service/.env
+    environment:
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_TOPIC_PREFIX: ""
+      KAFKA_GROUP_ID: realtime-service
+      AUTH_GRPC_ENDPOINT: auth-service:50051
+      GRPC_ADDR: :50056
+      HTTP_ADDR: :8081
+    ports:
+      - "50056:50056"
+      - "8081:8081"
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
   api-service:
     container_name: psp-api-service
     build:
@@ -287,6 +365,9 @@ services:
       POLL_GRPC_ENDPOINT: poll-service:50052
       VOTE_GRPC_ENDPOINT: vote-service:50053
       FEED_GRPC_ENDPOINT: feed-service:50054
+      ANALYTICS_GRPC_ENDPOINT: analytics-service:50055
+      REALTIME_GRPC_ENDPOINT: realtime-service:50056
+      ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000,http://localhost:8082,http://127.0.0.1:8082
     ports:
       - "8080:8080"
     depends_on:
@@ -294,6 +375,23 @@ services:
       - poll-service
       - vote-service
       - feed-service
+      - analytics-service
+      - realtime-service
+    restart: unless-stopped
+
+  swagger-ui:
+    image: swaggerapi/swagger-ui:v5.17.14
+    container_name: psp-swagger-ui
+    environment:
+      SWAGGER_JSON: /openapi/openapi.yml
+      TRY_IT_OUT_ENABLED: "true"
+    volumes:
+      - ./back/services/api-service/api/openapi.yml:/openapi/openapi.yml:ro
+    ports:
+      - "8082:8080"
+    depends_on:
+      api-service:
+        condition: service_started
     restart: unless-stopped
 
 volumes:
@@ -301,3 +399,4 @@ volumes:
   poll_postgres_data:
   vote_postgres_data:
   feed_postgres_data:
+  analytics_postgres_data:

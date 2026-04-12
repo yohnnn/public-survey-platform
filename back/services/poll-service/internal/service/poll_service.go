@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yohnnn/public-survey-platform/back/api/events"
+	"github.com/yohnnn/public-survey-platform/back/pkg/events"
 	"github.com/yohnnn/public-survey-platform/back/pkg/outbox"
 	"github.com/yohnnn/public-survey-platform/back/pkg/tx"
 	"github.com/yohnnn/public-survey-platform/back/services/poll-service/internal/models"
@@ -82,6 +82,8 @@ func (s *pollService) CreatePoll(ctx context.Context, userID, question string, p
 
 	normalizedTags := normalizeTags(tags)
 	err := s.tx.WithTx(ctx, func(txCtx context.Context) error {
+		eventID := s.ids.NewID()
+
 		ensuredTags, ensureErr := s.tags.EnsureByNames(txCtx, normalizedTags)
 		if ensureErr != nil {
 			return ensureErr
@@ -96,13 +98,13 @@ func (s *pollService) CreatePoll(ctx context.Context, userID, question string, p
 			return createErr
 		}
 
-		payload, eventErr := marshalPollCreatedPayload(poll, pollOptions, normalizedTags)
+		payload, eventErr := marshalPollCreatedPayload(eventID, poll, pollOptions, normalizedTags)
 		if eventErr != nil {
 			return eventErr
 		}
 
 		if outboxErr := s.outbox.Add(txCtx, outbox.Event{
-			ID:      s.ids.NewID(),
+			ID:      eventID,
 			Topic:   events.TopicPollCreated,
 			Key:     poll.ID,
 			Payload: payload,
@@ -242,6 +244,8 @@ func (s *pollService) UpdatePoll(ctx context.Context, userID, id string, questio
 	}
 
 	err := s.tx.WithTx(ctx, func(txCtx context.Context) error {
+		eventID := s.ids.NewID()
+
 		if updateErr := s.polls.UpdateByIDAndCreator(txCtx, id, userID, patch); updateErr != nil {
 			if errors.Is(updateErr, models.ErrForbidden) {
 				_, getErr := s.polls.GetByID(txCtx, id)
@@ -266,7 +270,31 @@ func (s *pollService) UpdatePoll(ctx context.Context, userID, id string, questio
 				return replaceErr
 			}
 		}
-		return nil
+
+		updatedPoll, getErr := s.polls.GetByID(txCtx, id)
+		if getErr != nil {
+			return getErr
+		}
+		tagsMap, getTagsErr := s.polls.GetTagsByPollIDs(txCtx, []string{id})
+		if getTagsErr != nil {
+			return getTagsErr
+		}
+		updatedPoll.Tags = tagsMap[id]
+		if updatedPoll.Tags == nil {
+			updatedPoll.Tags = []string{}
+		}
+
+		payload, marshalErr := marshalPollUpdatedPayload(eventID, updatedPoll, s.clock.Now().UTC())
+		if marshalErr != nil {
+			return marshalErr
+		}
+
+		return s.outbox.Add(txCtx, outbox.Event{
+			ID:      eventID,
+			Topic:   events.TopicPollUpdated,
+			Key:     id,
+			Payload: payload,
+		})
 	})
 	if err != nil {
 		return models.Poll{}, err
@@ -284,16 +312,32 @@ func (s *pollService) DeletePoll(ctx context.Context, userID, id string) error {
 		return models.ErrInvalidArgument
 	}
 
-	err := s.polls.DeleteByIDAndCreator(ctx, id, userID)
-	if err == nil {
-		return nil
-	}
-	if errors.Is(err, models.ErrForbidden) {
-		if _, getErr := s.polls.GetByID(ctx, id); getErr != nil {
-			return getErr
+	return s.tx.WithTx(ctx, func(txCtx context.Context) error {
+		eventID := s.ids.NewID()
+
+		deleteErr := s.polls.DeleteByIDAndCreator(txCtx, id, userID)
+		if deleteErr != nil {
+			if errors.Is(deleteErr, models.ErrForbidden) {
+				_, getErr := s.polls.GetByID(txCtx, id)
+				if getErr != nil {
+					return getErr
+				}
+			}
+			return deleteErr
 		}
-	}
-	return err
+
+		payload, marshalErr := marshalPollDeletedPayload(eventID, id, s.clock.Now().UTC())
+		if marshalErr != nil {
+			return marshalErr
+		}
+
+		return s.outbox.Add(txCtx, outbox.Event{
+			ID:      eventID,
+			Topic:   events.TopicPollDeleted,
+			Key:     id,
+			Payload: payload,
+		})
+	})
 }
 
 func (s *pollService) CreateTag(ctx context.Context, name string) (models.Tag, error) {
@@ -359,6 +403,7 @@ func normalizeEndsAt(endsAt *time.Time) *time.Time {
 }
 
 type pollCreatedPayload struct {
+	EventID     string       `json:"event_id"`
 	PollID      string       `json:"poll_id"`
 	CreatorID   string       `json:"creator_id"`
 	Question    string       `json:"question"`
@@ -370,13 +415,28 @@ type pollCreatedPayload struct {
 	Tags        []string     `json:"tags"`
 }
 
+type pollUpdatedPayload struct {
+	EventID   string     `json:"event_id"`
+	PollID    string     `json:"poll_id"`
+	Question  string     `json:"question"`
+	Tags      []string   `json:"tags"`
+	UpdatedAt time.Time  `json:"updated_at"`
+	EndsAt    *time.Time `json:"ends_at,omitempty"`
+}
+
+type pollDeletedPayload struct {
+	EventID   string    `json:"event_id"`
+	PollID    string    `json:"poll_id"`
+	DeletedAt time.Time `json:"deleted_at"`
+}
+
 type pollOption struct {
 	ID       string `json:"id"`
 	Text     string `json:"text"`
 	Position int32  `json:"position"`
 }
 
-func marshalPollCreatedPayload(poll models.Poll, options []models.PollOption, tags []string) ([]byte, error) {
+func marshalPollCreatedPayload(eventID string, poll models.Poll, options []models.PollOption, tags []string) ([]byte, error) {
 	payloadOptions := make([]pollOption, 0, len(options))
 	for _, option := range options {
 		payloadOptions = append(payloadOptions, pollOption{
@@ -387,6 +447,7 @@ func marshalPollCreatedPayload(poll models.Poll, options []models.PollOption, ta
 	}
 
 	payload, err := json.Marshal(pollCreatedPayload{
+		EventID:     eventID,
 		PollID:      poll.ID,
 		CreatorID:   poll.CreatorID,
 		Question:    poll.Question,
@@ -396,6 +457,35 @@ func marshalPollCreatedPayload(poll models.Poll, options []models.PollOption, ta
 		CreatedAt:   poll.CreatedAt,
 		Options:     payloadOptions,
 		Tags:        tags,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return payload, nil
+}
+
+func marshalPollUpdatedPayload(eventID string, poll models.Poll, updatedAt time.Time) ([]byte, error) {
+	payload, err := json.Marshal(pollUpdatedPayload{
+		EventID:   eventID,
+		PollID:    poll.ID,
+		Question:  poll.Question,
+		Tags:      poll.Tags,
+		UpdatedAt: updatedAt,
+		EndsAt:    poll.EndsAt,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return payload, nil
+}
+
+func marshalPollDeletedPayload(eventID, pollID string, deletedAt time.Time) ([]byte, error) {
+	payload, err := json.Marshal(pollDeletedPayload{
+		EventID:   eventID,
+		PollID:    pollID,
+		DeletedAt: deletedAt,
 	})
 	if err != nil {
 		return nil, err
