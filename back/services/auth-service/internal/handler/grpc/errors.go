@@ -1,36 +1,22 @@
 package grpc
 
 import (
-	"errors"
-
+	"github.com/yohnnn/public-survey-platform/back/pkg/apperrors"
 	"github.com/yohnnn/public-survey-platform/back/services/auth-service/internal/models"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
-func toStatusError(err error) error {
-	if err == nil {
-		return nil
-	}
+var grpcErrorRules = []apperrors.GRPCRule{
+	{Target: models.ErrEmailAlreadyExists, Code: codes.AlreadyExists},
+	{Target: models.ErrInvalidCredentials, Code: codes.Unauthenticated},
+	{Target: models.ErrInvalidToken, Code: codes.Unauthenticated},
+	{Target: models.ErrUnauthorized, Code: codes.Unauthenticated},
+	{Target: models.ErrUserNotFound, Code: codes.NotFound},
+	{Target: models.ErrSessionNotFound, Code: codes.NotFound},
+	{Target: models.ErrSessionExpired, Code: codes.Unauthenticated},
+	{Target: models.ErrSessionRevoked, Code: codes.Unauthenticated},
+}
 
-	switch {
-	case errors.Is(err, models.ErrEmailAlreadyExists):
-		return status.Error(codes.AlreadyExists, err.Error())
-	case errors.Is(err, models.ErrInvalidCredentials):
-		return status.Error(codes.Unauthenticated, err.Error())
-	case errors.Is(err, models.ErrInvalidToken):
-		return status.Error(codes.Unauthenticated, err.Error())
-	case errors.Is(err, models.ErrUnauthorized):
-		return status.Error(codes.Unauthenticated, err.Error())
-	case errors.Is(err, models.ErrUserNotFound):
-		return status.Error(codes.NotFound, err.Error())
-	case errors.Is(err, models.ErrSessionNotFound):
-		return status.Error(codes.NotFound, err.Error())
-	case errors.Is(err, models.ErrSessionExpired):
-		return status.Error(codes.Unauthenticated, err.Error())
-	case errors.Is(err, models.ErrSessionRevoked):
-		return status.Error(codes.Unauthenticated, err.Error())
-	default:
-		return status.Error(codes.Internal, "internal error")
-	}
+func toStatusError(err error) error {
+	return apperrors.ToGRPC(err, grpcErrorRules...)
 }

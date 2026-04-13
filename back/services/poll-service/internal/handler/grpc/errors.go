@@ -1,32 +1,20 @@
 package grpc
 
 import (
-	"errors"
-
+	"github.com/yohnnn/public-survey-platform/back/pkg/apperrors"
 	"github.com/yohnnn/public-survey-platform/back/services/poll-service/internal/models"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
-func toStatusError(err error) error {
-	if err == nil {
-		return nil
-	}
+var grpcErrorRules = []apperrors.GRPCRule{
+	{Target: models.ErrInvalidArgument, Code: codes.InvalidArgument},
+	{Target: models.ErrUnauthorized, Code: codes.Unauthenticated},
+	{Target: models.ErrForbidden, Code: codes.PermissionDenied},
+	{Target: models.ErrPollNotFound, Code: codes.NotFound},
+	{Target: models.ErrTagNotFound, Code: codes.NotFound},
+	{Target: models.ErrTagAlreadyExist, Code: codes.AlreadyExists},
+}
 
-	switch {
-	case errors.Is(err, models.ErrInvalidArgument):
-		return status.Error(codes.InvalidArgument, err.Error())
-	case errors.Is(err, models.ErrUnauthorized):
-		return status.Error(codes.Unauthenticated, err.Error())
-	case errors.Is(err, models.ErrForbidden):
-		return status.Error(codes.PermissionDenied, err.Error())
-	case errors.Is(err, models.ErrPollNotFound):
-		return status.Error(codes.NotFound, err.Error())
-	case errors.Is(err, models.ErrTagNotFound):
-		return status.Error(codes.NotFound, err.Error())
-	case errors.Is(err, models.ErrTagAlreadyExist):
-		return status.Error(codes.AlreadyExists, err.Error())
-	default:
-		return status.Error(codes.Internal, "internal error")
-	}
+func toStatusError(err error) error {
+	return apperrors.ToGRPC(err, grpcErrorRules...)
 }

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -20,6 +21,7 @@ import (
 	realtimev1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/realtime/v1"
 	"github.com/yohnnn/public-survey-platform/back/pkg/events"
 	"github.com/yohnnn/public-survey-platform/back/pkg/grpcinterceptor"
+	applogger "github.com/yohnnn/public-survey-platform/back/pkg/logger"
 	"github.com/yohnnn/public-survey-platform/back/services/realtime-service/internal/config"
 	grpcHandler "github.com/yohnnn/public-survey-platform/back/services/realtime-service/internal/handler/grpc"
 	"github.com/yohnnn/public-survey-platform/back/services/realtime-service/internal/hub"
@@ -36,7 +38,8 @@ import (
 type tokenValidator func(ctx context.Context, token string) (string, error)
 
 func main() {
-	logger := log.New(os.Stdout, "[realtime-service] ", log.LstdFlags|log.Lmicroseconds)
+	serviceLogger := applogger.NewJSON("realtime-service")
+	logger := serviceLogger.StdLogger()
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -79,7 +82,9 @@ func main() {
 	}
 
 	consumer := realtimekafka.NewRealtimeConsumer(subscriber, realtimeSvc, logger, cfg.EventDedupTTL)
+	consumerDone := make(chan struct{})
 	go func() {
+		defer close(consumerDone)
 		if runErr := consumer.Run(ctx); runErr != nil && !errors.Is(runErr, context.Canceled) {
 			logger.Printf("consumer stopped: %v", runErr)
 		}
@@ -87,7 +92,7 @@ func main() {
 
 	authInterceptor := grpcinterceptor.UnaryAuthInterceptor(validateToken, nil)
 	streamAuth := streamAuthInterceptor(validateToken, nil)
-	loggingInterceptor := grpcinterceptor.UnaryLoggingInterceptor(logger)
+	loggingInterceptor := grpcinterceptor.UnaryLoggingInterceptor(serviceLogger.Slog())
 
 	grpcServer := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(loggingInterceptor, authInterceptor),
@@ -101,7 +106,7 @@ func main() {
 		logger.Fatalf("listen grpc %s: %v", cfg.GRPCAddr, err)
 	}
 
-	httpServer := buildHTTPServer(cfg, realtimeSvc, validateToken, logger)
+	httpServer := buildHTTPServer(cfg, realtimeSvc, validateToken, serviceLogger.Slog())
 
 	errCh := make(chan error, 2)
 	go func() {
@@ -113,22 +118,71 @@ func main() {
 		errCh <- httpServer.ListenAndServe()
 	}()
 
+	var serveErr error
 	select {
 	case <-ctx.Done():
-		grpcServer.GracefulStop()
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		if shutdownErr := httpServer.Shutdown(shutdownCtx); shutdownErr != nil {
-			logger.Printf("http shutdown error: %v", shutdownErr)
+		logger.Println("shutdown signal received")
+	case serveErr = <-errCh:
+		if serveErr != nil && serveErr != http.ErrServerClosed && !errors.Is(serveErr, grpc.ErrServerStopped) {
+			logger.Printf("serve error: %v", serveErr)
 		}
-	case serveErr := <-errCh:
-		if serveErr != nil && serveErr != http.ErrServerClosed {
-			logger.Fatalf("serve error: %v", serveErr)
-		}
+		stop()
+	}
+
+	gracefulStopGRPC(logger, grpcServer, 10*time.Second)
+	shutdownHTTPServer(logger, httpServer, 10*time.Second)
+	waitForShutdown(logger, "realtime consumer", consumerDone, 10*time.Second)
+
+	if serveErr != nil && serveErr != http.ErrServerClosed && !errors.Is(serveErr, grpc.ErrServerStopped) {
+		logger.Fatal("service stopped with serve error")
 	}
 }
 
-func buildHTTPServer(cfg config.Config, svc service.RealtimeService, validate tokenValidator, logger *log.Logger) *http.Server {
+func gracefulStopGRPC(logger *log.Logger, srv *grpc.Server, timeout time.Duration) {
+	if srv == nil {
+		return
+	}
+
+	done := make(chan struct{})
+	go func() {
+		srv.GracefulStop()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(timeout):
+		logger.Printf("grpc graceful stop timed out after %s, forcing stop", timeout)
+		srv.Stop()
+	}
+}
+
+func shutdownHTTPServer(logger *log.Logger, server *http.Server, timeout time.Duration) {
+	if server == nil {
+		return
+	}
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	if err := server.Shutdown(shutdownCtx); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		logger.Printf("http shutdown error: %v", err)
+	}
+}
+
+func waitForShutdown(logger *log.Logger, name string, done <-chan struct{}, timeout time.Duration) {
+	if done == nil {
+		return
+	}
+
+	select {
+	case <-done:
+	case <-time.After(timeout):
+		logger.Printf("timeout while waiting for %s shutdown after %s", name, timeout)
+	}
+}
+
+func buildHTTPServer(cfg config.Config, svc service.RealtimeService, validate tokenValidator, logger *slog.Logger) *http.Server {
 	originPolicy := newOriginPolicy(cfg.AllowedOrigins)
 	limiter := newConnectionLimiter(cfg.MaxConnectionsPerIP, cfg.ConnectRatePerMinute)
 
@@ -337,11 +391,39 @@ func parsePollIDFromSSEPath(path string) (string, bool) {
 	return pollID, true
 }
 
-func requestLoggingMiddleware(logger *log.Logger, next http.Handler) http.Handler {
+func requestLoggingMiddleware(logger *slog.Logger, next http.Handler) http.Handler {
+	if logger == nil {
+		logger = slog.Default()
+	}
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		logger.Printf("http %s %s", r.Method, r.URL.Path)
-		next.ServeHTTP(w, r)
+		requestID := applogger.EnsureRequestID(r.Header.Get(applogger.RequestIDHeader))
+		r.Header.Set(applogger.RequestIDHeader, requestID)
+		w.Header().Set(applogger.RequestIDHeader, requestID)
+
+		start := time.Now()
+		wrapped := &statusResponseWriter{ResponseWriter: w, statusCode: http.StatusOK}
+		next.ServeHTTP(wrapped, r)
+
+		logger.InfoContext(r.Context(), "http request completed",
+			"component", "http",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"status", wrapped.statusCode,
+			"duration_ms", float64(time.Since(start).Microseconds())/1000,
+			"request_id", requestID,
+		)
 	})
+}
+
+type statusResponseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (w *statusResponseWriter) WriteHeader(statusCode int) {
+	w.statusCode = statusCode
+	w.ResponseWriter.WriteHeader(statusCode)
 }
 
 func streamAuthInterceptor(validate tokenValidator, publicMethods map[string]struct{}) grpc.StreamServerInterceptor {

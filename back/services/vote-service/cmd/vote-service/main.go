@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc"
@@ -20,6 +21,7 @@ import (
 	votev1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/vote/v1"
 	"github.com/yohnnn/public-survey-platform/back/pkg/events"
 	"github.com/yohnnn/public-survey-platform/back/pkg/grpcinterceptor"
+	applogger "github.com/yohnnn/public-survey-platform/back/pkg/logger"
 	"github.com/yohnnn/public-survey-platform/back/pkg/outbox"
 	"github.com/yohnnn/public-survey-platform/back/pkg/tx"
 	"github.com/yohnnn/public-survey-platform/back/services/vote-service/internal/config"
@@ -29,7 +31,8 @@ import (
 )
 
 func main() {
-	logger := log.New(os.Stdout, "[vote-service] ", log.LstdFlags|log.Lmicroseconds)
+	serviceLogger := applogger.NewJSON("vote-service")
+	logger := serviceLogger.StdLogger()
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -83,7 +86,9 @@ func main() {
 	}
 
 	outboxRelay := outbox.NewRelay(outboxRepo, publisher, outbox.NewSystemClock(), logger, cfg.OutboxInterval, cfg.OutboxBatchSize)
+	outboxDone := make(chan struct{})
 	go func() {
+		defer close(outboxDone)
 		if runErr := outboxRelay.Run(ctx); runErr != nil && !errors.Is(runErr, context.Canceled) {
 			logger.Printf("outbox relay stopped: %v", runErr)
 		}
@@ -102,7 +107,7 @@ func main() {
 		},
 		nil,
 	)
-	loggingInterceptor := grpcinterceptor.UnaryLoggingInterceptor(logger)
+	loggingInterceptor := grpcinterceptor.UnaryLoggingInterceptor(serviceLogger.Slog())
 
 	srv := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(loggingInterceptor, authInterceptor),
@@ -121,13 +126,52 @@ func main() {
 		errCh <- srv.Serve(lis)
 	}()
 
+	var serveErr error
 	select {
 	case <-ctx.Done():
-		srv.GracefulStop()
-		pool.Close()
-	case serveErr := <-errCh:
-		if serveErr != nil {
-			logger.Fatalf("grpc serve: %v", serveErr)
+		logger.Println("shutdown signal received")
+	case serveErr = <-errCh:
+		if serveErr != nil && !errors.Is(serveErr, grpc.ErrServerStopped) {
+			logger.Printf("grpc serve error: %v", serveErr)
 		}
+		stop()
+	}
+
+	gracefulStopGRPC(logger, srv, 10*time.Second)
+	waitForShutdown(logger, "vote outbox relay", outboxDone, 10*time.Second)
+
+	if serveErr != nil && !errors.Is(serveErr, grpc.ErrServerStopped) {
+		logger.Fatal("service stopped with serve error")
+	}
+}
+
+func gracefulStopGRPC(logger *log.Logger, srv *grpc.Server, timeout time.Duration) {
+	if srv == nil {
+		return
+	}
+
+	done := make(chan struct{})
+	go func() {
+		srv.GracefulStop()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(timeout):
+		logger.Printf("grpc graceful stop timed out after %s, forcing stop", timeout)
+		srv.Stop()
+	}
+}
+
+func waitForShutdown(logger *log.Logger, name string, done <-chan struct{}, timeout time.Duration) {
+	if done == nil {
+		return
+	}
+
+	select {
+	case <-done:
+	case <-time.After(timeout):
+		logger.Printf("timeout while waiting for %s shutdown after %s", name, timeout)
 	}
 }

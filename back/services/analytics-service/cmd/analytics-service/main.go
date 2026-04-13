@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc"
@@ -16,6 +17,7 @@ import (
 	analyticsv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/analytics/v1"
 	"github.com/yohnnn/public-survey-platform/back/pkg/events"
 	"github.com/yohnnn/public-survey-platform/back/pkg/grpcinterceptor"
+	applogger "github.com/yohnnn/public-survey-platform/back/pkg/logger"
 	"github.com/yohnnn/public-survey-platform/back/pkg/tx"
 	"github.com/yohnnn/public-survey-platform/back/services/analytics-service/internal/config"
 	grpcHandler "github.com/yohnnn/public-survey-platform/back/services/analytics-service/internal/handler/grpc"
@@ -25,7 +27,8 @@ import (
 )
 
 func main() {
-	logger := log.New(os.Stdout, "[analytics-service] ", log.LstdFlags|log.Lmicroseconds)
+	serviceLogger := applogger.NewJSON("analytics-service")
+	logger := serviceLogger.StdLogger()
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -57,13 +60,15 @@ func main() {
 	}
 
 	consumer := analyticskafka.NewAnalyticsConsumer(subscriber, analyticsRepo, txMgr, logger)
+	consumerDone := make(chan struct{})
 	go func() {
+		defer close(consumerDone)
 		if runErr := consumer.Run(ctx); runErr != nil && !errors.Is(runErr, context.Canceled) {
 			logger.Printf("consumer stopped: %v", runErr)
 		}
 	}()
 
-	loggingInterceptor := grpcinterceptor.UnaryLoggingInterceptor(logger)
+	loggingInterceptor := grpcinterceptor.UnaryLoggingInterceptor(serviceLogger.Slog())
 	srv := grpc.NewServer(grpc.ChainUnaryInterceptor(loggingInterceptor))
 
 	analyticsv1.RegisterAnalyticsServiceServer(srv, grpcHandler.NewHandler(analyticsSvc))
@@ -80,13 +85,52 @@ func main() {
 		errCh <- srv.Serve(lis)
 	}()
 
+	var serveErr error
 	select {
 	case <-ctx.Done():
-		srv.GracefulStop()
-		pool.Close()
-	case serveErr := <-errCh:
-		if serveErr != nil {
-			logger.Fatalf("grpc serve: %v", serveErr)
+		logger.Println("shutdown signal received")
+	case serveErr = <-errCh:
+		if serveErr != nil && !errors.Is(serveErr, grpc.ErrServerStopped) {
+			logger.Printf("grpc serve error: %v", serveErr)
 		}
+		stop()
+	}
+
+	gracefulStopGRPC(logger, srv, 10*time.Second)
+	waitForShutdown(logger, "analytics consumer", consumerDone, 10*time.Second)
+
+	if serveErr != nil && !errors.Is(serveErr, grpc.ErrServerStopped) {
+		logger.Fatal("service stopped with serve error")
+	}
+}
+
+func gracefulStopGRPC(logger *log.Logger, srv *grpc.Server, timeout time.Duration) {
+	if srv == nil {
+		return
+	}
+
+	done := make(chan struct{})
+	go func() {
+		srv.GracefulStop()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(timeout):
+		logger.Printf("grpc graceful stop timed out after %s, forcing stop", timeout)
+		srv.Stop()
+	}
+}
+
+func waitForShutdown(logger *log.Logger, name string, done <-chan struct{}, timeout time.Duration) {
+	if done == nil {
+		return
+	}
+
+	select {
+	case <-done:
+	case <-time.After(timeout):
+		logger.Printf("timeout while waiting for %s shutdown after %s", name, timeout)
 	}
 }

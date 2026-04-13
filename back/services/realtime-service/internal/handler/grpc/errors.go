@@ -1,22 +1,15 @@
 package grpc
 
 import (
-	"errors"
-
+	"github.com/yohnnn/public-survey-platform/back/pkg/apperrors"
 	"github.com/yohnnn/public-survey-platform/back/services/realtime-service/internal/models"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
-func toStatusError(err error) error {
-	if err == nil {
-		return nil
-	}
+var grpcErrorRules = []apperrors.GRPCRule{
+	{Target: models.ErrInvalidArgument, Code: codes.InvalidArgument},
+}
 
-	switch {
-	case errors.Is(err, models.ErrInvalidArgument):
-		return status.Error(codes.InvalidArgument, err.Error())
-	default:
-		return status.Error(codes.Internal, "internal error")
-	}
+func toStatusError(err error) error {
+	return apperrors.ToGRPC(err, grpcErrorRules...)
 }

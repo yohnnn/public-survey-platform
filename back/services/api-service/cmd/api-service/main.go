@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -17,6 +17,7 @@ import (
 	pollv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/poll/v1"
 	realtimev1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/realtime/v1"
 	votev1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/vote/v1"
+	applogger "github.com/yohnnn/public-survey-platform/back/pkg/logger"
 	"github.com/yohnnn/public-survey-platform/back/services/api-service/internal/config"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -24,7 +25,8 @@ import (
 )
 
 func main() {
-	logger := log.New(os.Stdout, "[api-service] ", log.LstdFlags|log.Lmicroseconds)
+	serviceLogger := applogger.NewJSON("api-service")
+	logger := serviceLogger.StdLogger()
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -81,6 +83,7 @@ func main() {
 		mux.ServeHTTP(w, r)
 	})
 	handler = corsMiddleware(newOriginPolicy(cfg.AllowedOrigins), handler)
+	handler = requestLoggingMiddleware(serviceLogger.Slog(), handler)
 
 	httpServer := &http.Server{
 		Addr:              cfg.HTTPAddr,
@@ -106,6 +109,41 @@ func main() {
 			logger.Fatalf("http serve: %v", serveErr)
 		}
 	}
+}
+
+func requestLoggingMiddleware(logger *slog.Logger, next http.Handler) http.Handler {
+	if logger == nil {
+		logger = slog.Default()
+	}
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestID := applogger.EnsureRequestID(r.Header.Get(applogger.RequestIDHeader))
+		r.Header.Set(applogger.RequestIDHeader, requestID)
+		w.Header().Set(applogger.RequestIDHeader, requestID)
+
+		start := time.Now()
+		wrapped := &statusResponseWriter{ResponseWriter: w, statusCode: http.StatusOK}
+		next.ServeHTTP(wrapped, r)
+
+		logger.InfoContext(r.Context(), "http request completed",
+			"component", "http",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"status", wrapped.statusCode,
+			"duration_ms", float64(time.Since(start).Microseconds())/1000,
+			"request_id", requestID,
+		)
+	})
+}
+
+type statusResponseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (w *statusResponseWriter) WriteHeader(statusCode int) {
+	w.statusCode = statusCode
+	w.ResponseWriter.WriteHeader(statusCode)
 }
 
 type originPolicy struct {

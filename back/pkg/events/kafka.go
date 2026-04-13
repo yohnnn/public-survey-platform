@@ -79,19 +79,21 @@ func (p *KafkaPublisher) Close() error {
 }
 
 type KafkaSubscriberConfig struct {
-	Brokers      []string
-	GroupID      string
-	TopicPrefix  string
-	ReadTimeout  time.Duration
-	CommitPeriod time.Duration
+	Brokers         []string
+	GroupID         string
+	TopicPrefix     string
+	ReadTimeout     time.Duration
+	CommitPeriod    time.Duration
+	ShutdownTimeout time.Duration
 }
 
 type KafkaSubscriber struct {
-	brokers      []string
-	groupID      string
-	topicPrefix  string
-	readTimeout  time.Duration
-	commitPeriod time.Duration
+	brokers         []string
+	groupID         string
+	topicPrefix     string
+	readTimeout     time.Duration
+	commitPeriod    time.Duration
+	shutdownTimeout time.Duration
 }
 
 func NewKafkaSubscriber(cfg KafkaSubscriberConfig) (*KafkaSubscriber, error) {
@@ -109,13 +111,17 @@ func NewKafkaSubscriber(cfg KafkaSubscriberConfig) (*KafkaSubscriber, error) {
 	if cfg.CommitPeriod <= 0 {
 		cfg.CommitPeriod = time.Second
 	}
+	if cfg.ShutdownTimeout <= 0 {
+		cfg.ShutdownTimeout = 10 * time.Second
+	}
 
 	return &KafkaSubscriber{
-		brokers:      brokers,
-		groupID:      strings.TrimSpace(cfg.GroupID),
-		topicPrefix:  normalizePrefix(cfg.TopicPrefix),
-		readTimeout:  cfg.ReadTimeout,
-		commitPeriod: cfg.CommitPeriod,
+		brokers:         brokers,
+		groupID:         strings.TrimSpace(cfg.GroupID),
+		topicPrefix:     normalizePrefix(cfg.TopicPrefix),
+		readTimeout:     cfg.ReadTimeout,
+		commitPeriod:    cfg.CommitPeriod,
+		shutdownTimeout: cfg.ShutdownTimeout,
 	}, nil
 }
 
@@ -157,20 +163,39 @@ func (s *KafkaSubscriber) Subscribe(ctx context.Context, topics []string, handle
 			return err
 		}
 
-		handleErr := handler(ctx, Message{
+		handleCtx := ctx
+		handleCancel := func() {}
+		if ctx.Err() != nil {
+			handleCtx, handleCancel = context.WithTimeout(context.Background(), s.shutdownTimeout)
+		}
+
+		handleErr := handler(handleCtx, Message{
 			Topic:   msg.Topic,
 			Key:     string(msg.Key),
 			Payload: msg.Value,
 		})
+		handleCancel()
 		if handleErr != nil {
 			return handleErr
 		}
 
-		if err := reader.CommitMessages(ctx, msg); err != nil {
+		commitCtx := ctx
+		commitCancel := func() {}
+		if ctx.Err() != nil {
+			commitCtx, commitCancel = context.WithTimeout(context.Background(), s.shutdownTimeout)
+		}
+
+		if err := reader.CommitMessages(commitCtx, msg); err != nil {
+			commitCancel()
 			if ctx.Err() != nil {
 				return nil
 			}
 			return err
+		}
+		commitCancel()
+
+		if ctx.Err() != nil {
+			return nil
 		}
 	}
 }
