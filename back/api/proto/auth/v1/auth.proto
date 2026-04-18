@@ -50,6 +50,13 @@ service AuthService {
       get: "/v1/auth/me"
     };
   }
+
+  rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse) {
+    option (google.api.http) = {
+      patch: "/v1/auth/me"
+      body: "*"
+    };
+  }
 }
 
 message User {
@@ -122,5 +129,16 @@ message LogoutAllResponse {
 }
 
 message GetUserResponse {
+  User user = 1;
+}
+
+message UpdateUserRequest {
+  optional string email = 1;
+  optional string country = 2;
+  optional string gender = 3;
+  optional int32 birth_year = 4;
+}
+
+message UpdateUserResponse {
   User user = 1;
 }

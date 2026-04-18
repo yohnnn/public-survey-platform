@@ -14,7 +14,6 @@ type Config struct {
 	VoteGRPCEndpoint      string
 	FeedGRPCEndpoint      string
 	AnalyticsGRPCEndpoint string
-	RealtimeGRPCEndpoint  string
 }
 
 func Load() (Config, error) {
@@ -26,7 +25,6 @@ func Load() (Config, error) {
 		VoteGRPCEndpoint:      strings.TrimSpace(getEnv("VOTE_GRPC_ENDPOINT", "")),
 		FeedGRPCEndpoint:      strings.TrimSpace(getEnv("FEED_GRPC_ENDPOINT", "")),
 		AnalyticsGRPCEndpoint: strings.TrimSpace(getEnv("ANALYTICS_GRPC_ENDPOINT", "")),
-		RealtimeGRPCEndpoint:  strings.TrimSpace(getEnv("REALTIME_GRPC_ENDPOINT", "")),
 	}
 
 	if len(cfg.AllowedOrigins) == 0 {
@@ -50,9 +48,6 @@ func Load() (Config, error) {
 	}
 	if cfg.AnalyticsGRPCEndpoint == "" {
 		return Config{}, fmt.Errorf("ANALYTICS_GRPC_ENDPOINT is required")
-	}
-	if cfg.RealtimeGRPCEndpoint == "" {
-		return Config{}, fmt.Errorf("REALTIME_GRPC_ENDPOINT is required")
 	}
 
 	return cfg, nil

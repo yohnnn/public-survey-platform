@@ -1,0 +1,53 @@
+groups:
+  - name: psp-basic-alerts
+    rules:
+      - alert: PrometheusTargetDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Scrape target is down"
+          description: "Target {{ $labels.job }} ({{ $labels.instance }}) has been unreachable for more than 2 minutes."
+
+      - alert: BlackboxProbeFailed
+        expr: probe_success == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Health probe failed"
+          description: "Probe for {{ $labels.instance }} has been failing for more than 2 minutes."
+
+      - alert: HighContainerCPUUsage
+        expr: |
+          sum by (container_label_com_docker_compose_service) (
+            rate(container_cpu_usage_seconds_total{container_label_com_docker_compose_service!="", image!=""}[5m])
+          ) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High container CPU usage"
+          description: "Service {{ $labels.container_label_com_docker_compose_service }} is using more than 0.8 CPU cores for 5 minutes."
+
+      - alert: HighContainerMemoryUsage
+        expr: |
+          sum by (container_label_com_docker_compose_service) (
+            container_memory_working_set_bytes{container_label_com_docker_compose_service!="", image!=""}
+          ) > 600 * 1024 * 1024
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High container memory usage"
+          description: "Service {{ $labels.container_label_com_docker_compose_service }} is using more than 600 MiB for 5 minutes."
+
+      - alert: RedisExporterDown
+        expr: up{job="redis-exporter"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis exporter is down"
+          description: "Prometheus cannot scrape redis-exporter for more than 2 minutes."

@@ -95,3 +95,35 @@ func (h *Handler) GetUser(ctx context.Context, _ *authv1.GetUserRequest) (*authv
 
 	return &authv1.GetUserResponse{User: mapUser(user)}, nil
 }
+
+func (h *Handler) UpdateUser(ctx context.Context, req *authv1.UpdateUserRequest) (*authv1.UpdateUserResponse, error) {
+	userID, ok := grpcinterceptor.UserIDFromContext(ctx)
+	if !ok || userID == "" {
+		return nil, toStatusError(models.ErrUnauthorized)
+	}
+
+	input := service.UpdateUserInput{}
+	if req.Email != nil {
+		email := req.GetEmail()
+		input.Email = &email
+	}
+	if req.Country != nil {
+		country := req.GetCountry()
+		input.Country = &country
+	}
+	if req.Gender != nil {
+		gender := req.GetGender()
+		input.Gender = &gender
+	}
+	if req.BirthYear != nil {
+		birthYear := req.GetBirthYear()
+		input.BirthYear = &birthYear
+	}
+
+	user, err := h.svc.UpdateUser(ctx, userID, input)
+	if err != nil {
+		return nil, toStatusError(err)
+	}
+
+	return &authv1.UpdateUserResponse{User: mapUser(user)}, nil
+}

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"os"
@@ -11,9 +12,12 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/yohnnn/public-survey-platform/back/pkg/cache/redisstore"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
+	authv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/auth/v1"
 	feedv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/feed/v1"
 	"github.com/yohnnn/public-survey-platform/back/pkg/events"
 	"github.com/yohnnn/public-survey-platform/back/pkg/grpcinterceptor"
@@ -24,6 +28,7 @@ import (
 	feedkafka "github.com/yohnnn/public-survey-platform/back/services/feed-service/internal/messaging/kafka"
 	"github.com/yohnnn/public-survey-platform/back/services/feed-service/internal/repository/postgres"
 	"github.com/yohnnn/public-survey-platform/back/services/feed-service/internal/service"
+	feedcache "github.com/yohnnn/public-survey-platform/back/services/feed-service/internal/service/cache"
 )
 
 func main() {
@@ -44,9 +49,35 @@ func main() {
 	}
 	defer pool.Close()
 
+	authConn, err := grpc.NewClient(cfg.AuthGRPCEndpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		logger.Fatalf("connect to auth service: %v", err)
+	}
+	defer authConn.Close()
+	authClient := authv1.NewAuthServiceClient(authConn)
+
 	feedRepo := postgres.NewFeedRepository(pool)
 	txMgr := tx.NewManager(pool)
 	feedSvc := service.NewFeedService(feedRepo)
+	if cfg.RedisAddr != "" {
+		cacheStore := redisstore.New(redisstore.Config{
+			Addr:     cfg.RedisAddr,
+			Password: cfg.RedisPassword,
+			DB:       cfg.RedisDB,
+		})
+
+		if pingErr := cacheStore.Ping(ctx); pingErr != nil {
+			logger.Printf("redis cache disabled: %v", pingErr)
+			_ = cacheStore.Close()
+		} else {
+			defer func() {
+				if closeErr := cacheStore.Close(); closeErr != nil {
+					logger.Printf("close redis cache store error: %v", closeErr)
+				}
+			}()
+			feedSvc = feedcache.NewFeedService(feedSvc, cacheStore, feedcache.DefaultConfig())
+		}
+	}
 
 	subscriber, err := events.NewKafkaSubscriber(events.KafkaSubscriberConfig{
 		Brokers:      cfg.KafkaBrokers,
@@ -68,10 +99,27 @@ func main() {
 		}
 	}()
 
+	authInterceptor := grpcinterceptor.UnaryAuthInterceptor(
+		func(ctx context.Context, token string) (string, error) {
+			resp, err := authClient.ValidateToken(ctx, &authv1.ValidateTokenRequest{AccessToken: token})
+			if err != nil {
+				return "", err
+			}
+			if !resp.GetValid() {
+				return "", fmt.Errorf("token is not valid")
+			}
+			return resp.GetUserId(), nil
+		},
+		map[string]struct{}{
+			feedv1.FeedService_GetFeed_FullMethodName:      {},
+			feedv1.FeedService_GetTrending_FullMethodName:  {},
+			feedv1.FeedService_GetUserPolls_FullMethodName: {},
+		},
+	)
 	loggingInterceptor := grpcinterceptor.UnaryLoggingInterceptor(serviceLogger.Slog())
 
 	srv := grpc.NewServer(
-		grpc.ChainUnaryInterceptor(loggingInterceptor),
+		grpc.ChainUnaryInterceptor(loggingInterceptor, authInterceptor),
 	)
 	feedv1.RegisterFeedServiceServer(srv, grpcHandler.NewHandler(feedSvc))
 	reflection.Register(srv)

@@ -24,6 +24,15 @@ service FeedService {
   rpc GetUserPolls(GetUserPollsRequest) returns (GetUserPollsResponse) {
     option (google.api.http) = {
       get: "/v1/feed/user/{user_id}"
+      additional_bindings {
+        get: "/v1/users/{user_id}/polls"
+      }
+    };
+  }
+
+  rpc GetMyPolls(GetMyPollsRequest) returns (GetUserPollsResponse) {
+    option (google.api.http) = {
+      get: "/v1/feed/me"
     };
   }
 }
@@ -59,6 +68,11 @@ message GetUserPollsRequest {
   string user_id = 1;
   string cursor = 2;
   uint32 limit = 3;
+}
+
+message GetMyPollsRequest {
+  string cursor = 1;
+  uint32 limit = 2;
 }
 
 message GetFeedResponse {

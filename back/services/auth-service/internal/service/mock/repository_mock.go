@@ -15,6 +15,7 @@ import (
 	time "time"
 
 	models "github.com/yohnnn/public-survey-platform/back/services/auth-service/internal/models"
+	repository "github.com/yohnnn/public-survey-platform/back/services/auth-service/internal/repository"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -100,6 +101,21 @@ func (m *MockUserRepository) GetByID(ctx context.Context, id string) (models.Use
 func (mr *MockUserRepositoryMockRecorder) GetByID(ctx, id any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByID", reflect.TypeOf((*MockUserRepository)(nil).GetByID), ctx, id)
+}
+
+// Update mocks base method.
+func (m *MockUserRepository) Update(ctx context.Context, id string, patch repository.UserUpdatePatch) (models.User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Update", ctx, id, patch)
+	ret0, _ := ret[0].(models.User)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Update indicates an expected call of Update.
+func (mr *MockUserRepositoryMockRecorder) Update(ctx, id, patch any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockUserRepository)(nil).Update), ctx, id, patch)
 }
 
 // MockSessionRepository is a mock of SessionRepository interface.

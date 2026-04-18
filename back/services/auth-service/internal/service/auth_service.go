@@ -189,3 +189,44 @@ func (s *authService) GetUser(ctx context.Context, userID string) (models.User, 
 	}
 	return s.users.GetByID(ctx, userID)
 }
+
+func (s *authService) UpdateUser(ctx context.Context, userID string, input UpdateUserInput) (models.User, error) {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return models.User{}, models.ErrUnauthorized
+	}
+
+	if input.Email == nil && input.Country == nil && input.Gender == nil && input.BirthYear == nil {
+		return models.User{}, models.ErrInvalidArgument
+	}
+
+	patch := repository.UserUpdatePatch{}
+
+	if input.Email != nil {
+		normalizedEmail := normalizeEmail(*input.Email)
+		if normalizedEmail == "" {
+			return models.User{}, models.ErrInvalidArgument
+		}
+		patch.Email = &normalizedEmail
+	}
+
+	if input.Country != nil {
+		country := strings.TrimSpace(*input.Country)
+		patch.Country = &country
+	}
+
+	if input.Gender != nil {
+		gender := strings.TrimSpace(*input.Gender)
+		patch.Gender = &gender
+	}
+
+	if input.BirthYear != nil {
+		if *input.BirthYear < 0 {
+			return models.User{}, models.ErrInvalidArgument
+		}
+		birthYear := *input.BirthYear
+		patch.BirthYear = &birthYear
+	}
+
+	return s.users.Update(ctx, userID, patch)
+}

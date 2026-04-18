@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -10,6 +11,9 @@ import (
 type Config struct {
 	GRPCAddr          string
 	DatabaseURL       string
+	RedisAddr         string
+	RedisPassword     string
+	RedisDB           int
 	KafkaBrokers      []string
 	KafkaTopicPrefix  string
 	KafkaReadTimeout  time.Duration
@@ -21,6 +25,9 @@ func Load() (Config, error) {
 	cfg := Config{
 		GRPCAddr:          getEnv("GRPC_ADDR", ":50055"),
 		DatabaseURL:       strings.TrimSpace(getEnv("DATABASE_URL", "")),
+		RedisAddr:         strings.TrimSpace(getEnv("REDIS_ADDR", "")),
+		RedisPassword:     getEnv("REDIS_PASSWORD", ""),
+		RedisDB:           getEnvInt("REDIS_DB", 0),
 		KafkaBrokers:      getEnvCSV("KAFKA_BROKERS"),
 		KafkaTopicPrefix:  strings.TrimSpace(getEnv("KAFKA_TOPIC_PREFIX", "")),
 		KafkaReadTimeout:  getEnvDuration("KAFKA_READ_TIMEOUT", 10*time.Second),
@@ -73,4 +80,18 @@ func getEnvCSV(key string) []string {
 		out = append(out, v)
 	}
 	return out
+}
+
+func getEnvInt(key string, fallback int) int {
+	v := strings.TrimSpace(os.Getenv(key))
+	if v == "" {
+		return fallback
+	}
+
+	i, err := strconv.Atoi(v)
+	if err != nil {
+		return fallback
+	}
+
+	return i
 }

@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -17,7 +16,6 @@ import (
 
 type e2eConfig struct {
 	APIBaseURL        string
-	RealtimeBaseURL   string
 	RequestTimeout    time.Duration
 	EventuallyTimeout time.Duration
 	EventuallyTick    time.Duration
@@ -26,7 +24,6 @@ type e2eConfig struct {
 func loadE2EConfig() e2eConfig {
 	return e2eConfig{
 		APIBaseURL:        "http://localhost:8080",
-		RealtimeBaseURL:   "http://localhost:8081",
 		RequestTimeout:    10 * time.Second,
 		EventuallyTimeout: 45 * time.Second,
 		EventuallyTick:    500 * time.Millisecond,
@@ -50,9 +47,6 @@ func newE2EClient(cfg e2eConfig) *e2eClient {
 func (c *e2eClient) requireServicesUp() error {
 	if err := c.checkHealth(c.cfg.APIBaseURL + "/healthz"); err != nil {
 		return fmt.Errorf("api-service healthcheck failed: %w", err)
-	}
-	if err := c.checkHealth(c.cfg.RealtimeBaseURL + "/healthz"); err != nil {
-		return fmt.Errorf("realtime-service healthcheck failed: %w", err)
 	}
 	return nil
 }
@@ -170,176 +164,6 @@ func (c *e2eClient) eventually(t *testing.T, title string, fn func() (bool, stri
 	}
 }
 
-func (c *e2eClient) openRealtimeSSE(t *testing.T, pollID, accessToken string) (<-chan map[string]any, func()) {
-	t.Helper()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	target := fmt.Sprintf("%s/v1/realtime/polls/%s/stream", c.cfg.RealtimeBaseURL, url.PathEscape(pollID))
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
-	if err != nil {
-		cancel()
-		t.Fatalf("create realtime SSE request: %v", err)
-	}
-	req.Header.Set("Accept", "text/event-stream")
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-
-	resp, err := c.streamClient.Do(req)
-	if err != nil {
-		cancel()
-		t.Fatalf("open realtime SSE stream: %v", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		raw, _ := io.ReadAll(resp.Body)
-		_ = resp.Body.Close()
-		cancel()
-		t.Fatalf("open realtime SSE stream status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(raw)))
-	}
-
-	events := make(chan map[string]any, 16)
-	done := make(chan struct{})
-
-	go func() {
-		defer close(done)
-		defer close(events)
-		defer resp.Body.Close()
-
-		scanner := bufio.NewScanner(resp.Body)
-		scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-
-		for scanner.Scan() {
-			line := strings.TrimSpace(scanner.Text())
-			if !strings.HasPrefix(line, "data:") {
-				continue
-			}
-
-			payload := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
-			if payload == "" {
-				continue
-			}
-
-			obj := map[string]any{}
-			if err := json.Unmarshal([]byte(payload), &obj); err != nil {
-				continue
-			}
-
-			select {
-			case events <- obj:
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-
-	closeFn := func() {
-		cancel()
-		_ = resp.Body.Close()
-		select {
-		case <-done:
-		case <-time.After(2 * time.Second):
-		}
-	}
-
-	return events, closeFn
-}
-
-func (c *e2eClient) openGatewayRealtimeStream(t *testing.T, pollID, accessToken string) (<-chan map[string]any, func()) {
-	t.Helper()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	target := fmt.Sprintf("%s/v1/realtime/polls/%s/stream", c.cfg.APIBaseURL, url.PathEscape(pollID))
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
-	if err != nil {
-		cancel()
-		t.Fatalf("create gateway stream request: %v", err)
-	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-
-	resp, err := c.streamClient.Do(req)
-	if err != nil {
-		cancel()
-		t.Fatalf("open gateway stream: %v", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		raw, _ := io.ReadAll(resp.Body)
-		_ = resp.Body.Close()
-		cancel()
-		t.Fatalf("open gateway stream status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(raw)))
-	}
-
-	events := make(chan map[string]any, 16)
-	done := make(chan struct{})
-
-	go func() {
-		defer close(done)
-		defer close(events)
-		defer resp.Body.Close()
-
-		scanner := bufio.NewScanner(resp.Body)
-		scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-
-		for scanner.Scan() {
-			line := strings.TrimSpace(scanner.Text())
-			if line == "" || !strings.HasPrefix(line, "{") {
-				continue
-			}
-
-			wrapper := map[string]any{}
-			if err := json.Unmarshal([]byte(line), &wrapper); err != nil {
-				continue
-			}
-
-			result, ok := wrapper["result"].(map[string]any)
-			if !ok {
-				continue
-			}
-
-			select {
-			case events <- result:
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-
-	closeFn := func() {
-		cancel()
-		_ = resp.Body.Close()
-		select {
-		case <-done:
-		case <-time.After(2 * time.Second):
-		}
-	}
-
-	return events, closeFn
-}
-
-func (c *e2eClient) waitForEventByPollID(t *testing.T, events <-chan map[string]any, pollID string) map[string]any {
-	t.Helper()
-
-	timer := time.NewTimer(c.cfg.EventuallyTimeout)
-	defer timer.Stop()
-
-	for {
-		select {
-		case evt, ok := <-events:
-			if !ok {
-				t.Fatalf("event stream closed before receiving event for poll %s", pollID)
-			}
-
-			if id, ok := stringByAnyKey(evt, "poll_id", "pollId"); ok && id == pollID {
-				return evt
-			}
-		case <-timer.C:
-			t.Fatalf("timeout waiting realtime event for poll %s", pollID)
-		}
-	}
-}
-
 func TestBackendE2EFullFlow(t *testing.T) {
 	cfg := loadE2EConfig()
 	client := newE2EClient(cfg)
@@ -383,6 +207,25 @@ func TestBackendE2EFullFlow(t *testing.T) {
 	user1ID := mustStringPath(t, meResp, "user", "id")
 	if gotEmail := strings.ToLower(mustStringPath(t, meResp, "user", "email")); gotEmail != user1Email {
 		t.Fatalf("unexpected /v1/auth/me email=%s want=%s", gotEmail, user1Email)
+	}
+
+	updatedCountry := "US"
+	updatedGender := "other"
+	updatedBirthYear := int32(1997)
+	updateMeResp := client.mustJSON(t, http.MethodPatch, cfg.APIBaseURL, "/v1/auth/me", accessToken1, map[string]any{
+		"country":   updatedCountry,
+		"gender":    updatedGender,
+		"birthYear": updatedBirthYear,
+	}, http.StatusOK)
+
+	if gotCountry := mustStringPath(t, updateMeResp, "user", "country"); gotCountry != updatedCountry {
+		t.Fatalf("unexpected updated country=%s want=%s", gotCountry, updatedCountry)
+	}
+	if gotGender := mustStringPath(t, updateMeResp, "user", "gender"); gotGender != updatedGender {
+		t.Fatalf("unexpected updated gender=%s want=%s", gotGender, updatedGender)
+	}
+	if gotBirthYear := mustInt32Path(t, updateMeResp, "user", "birthYear"); gotBirthYear != updatedBirthYear {
+		t.Fatalf("unexpected updated birthYear=%d want=%d", gotBirthYear, updatedBirthYear)
 	}
 
 	loginResp := client.mustJSON(t, http.MethodPost, cfg.APIBaseURL, "/v1/auth/login", "", map[string]any{
@@ -554,6 +397,20 @@ func TestBackendE2EFullFlow(t *testing.T) {
 		return true, "", nil
 	})
 
+	client.eventually(t, "my polls contains created poll", func() (bool, string, error) {
+		status, obj, raw, err := client.doJSON(http.MethodGet, cfg.APIBaseURL, "/v1/feed/me?limit=20", accessToken1, nil)
+		if err != nil {
+			return false, "", err
+		}
+		if status != http.StatusOK {
+			return false, fmt.Sprintf("status=%d body=%s", status, renderErrorBody(obj, raw)), nil
+		}
+		if _, ok := findItemByID(mustArrayPath(t, obj, "items"), pollID); !ok {
+			return false, "poll is not present in my polls yet", nil
+		}
+		return true, "", nil
+	})
+
 	client.eventually(t, "analytics summary is populated", func() (bool, string, error) {
 		status, obj, raw, err := client.doJSON(http.MethodGet, cfg.APIBaseURL, "/v1/polls/"+url.PathEscape(pollID)+"/analytics", "", nil)
 		if err != nil {
@@ -585,47 +442,6 @@ func TestBackendE2EFullFlow(t *testing.T) {
 	ageStatsResp := client.mustJSON(t, http.MethodGet, cfg.APIBaseURL, "/v1/polls/"+url.PathEscape(pollID)+"/analytics/age", "", nil, http.StatusOK)
 	if len(mustArrayPath(t, ageStatsResp, "items")) == 0 {
 		t.Fatalf("expected non-empty analytics age stats")
-	}
-
-	wsGatewayResp := client.mustJSON(t, http.MethodGet, cfg.APIBaseURL, "/v1/ws", accessToken1, nil, http.StatusOK)
-	if connectionID := mustStringPath(t, wsGatewayResp, "connectionId"); connectionID == "" {
-		t.Fatalf("gateway websocket handshake returned empty connectionId")
-	}
-
-	wsDirectResp := client.mustJSON(t, http.MethodGet, cfg.RealtimeBaseURL, "/v1/ws", accessToken1, nil, http.StatusOK)
-	if connectionID, ok := stringByAnyKey(wsDirectResp, "connection_id", "connectionId"); !ok || strings.TrimSpace(connectionID) == "" {
-		t.Fatalf("direct websocket handshake returned empty connection id")
-	}
-
-	sseEvents, closeSSE := client.openRealtimeSSE(t, pollID, accessToken1)
-	defer closeSSE()
-
-	client.mustJSON(t, http.MethodPost, cfg.APIBaseURL, votePath, accessToken1, map[string]any{
-		"optionIds": []string{optionBID},
-	}, http.StatusOK)
-
-	sseEvent := client.waitForEventByPollID(t, sseEvents, pollID)
-	sseEventType, ok := stringByAnyKey(sseEvent, "event")
-	if !ok {
-		t.Fatalf("sse event has no event field: %#v", sseEvent)
-	}
-	if sseEventType != "vote.cast" && sseEventType != "vote.removed" {
-		t.Fatalf("unexpected sse event type: %s", sseEventType)
-	}
-	if len(mustArrayPath(t, sseEvent, "option_ids")) == 0 {
-		t.Fatalf("sse event must include option_ids")
-	}
-
-	gatewayEvents, closeGatewayStream := client.openGatewayRealtimeStream(t, pollID, accessToken1)
-	defer closeGatewayStream()
-
-	client.mustJSON(t, http.MethodPost, cfg.APIBaseURL, votePath, accessToken1, map[string]any{
-		"optionIds": []string{optionAID},
-	}, http.StatusOK)
-
-	gatewayEvent := client.waitForEventByPollID(t, gatewayEvents, pollID)
-	if _, ok := stringByAnyKey(gatewayEvent, "event"); !ok {
-		t.Fatalf("gateway stream event has no event field: %#v", gatewayEvent)
 	}
 
 	deletePollResp := client.mustJSON(t, http.MethodDelete, cfg.APIBaseURL, "/v1/polls/"+url.PathEscape(pollID), accessToken1, nil, http.StatusOK)
@@ -755,6 +571,15 @@ func mustBoolPath(t *testing.T, root map[string]any, path ...string) bool {
 		t.Fatalf("field %s is not a bool: %#v", strings.Join(path, "."), value)
 	}
 	return b
+}
+
+func mustInt32Path(t *testing.T, root map[string]any, path ...string) int32 {
+	t.Helper()
+	v, err := int64ByPath(root, path...)
+	if err != nil {
+		t.Fatalf("field %s is not an int32: %v", strings.Join(path, "."), err)
+	}
+	return int32(v)
 }
 
 func int64ByPath(root map[string]any, path ...string) (int64, error) {

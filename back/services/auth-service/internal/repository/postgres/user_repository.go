@@ -10,6 +10,7 @@ import (
 
 	"github.com/yohnnn/public-survey-platform/back/pkg/tx"
 	"github.com/yohnnn/public-survey-platform/back/services/auth-service/internal/models"
+	repo "github.com/yohnnn/public-survey-platform/back/services/auth-service/internal/repository"
 )
 
 type UserRepository struct {
@@ -123,6 +124,49 @@ func (r *UserRepository) ExistsByEmail(ctx context.Context, email string) (bool,
 	}
 
 	return exists, nil
+}
+
+func (r *UserRepository) Update(ctx context.Context, id string, patch repo.UserUpdatePatch) (models.User, error) {
+	const query = `
+		UPDATE users
+		SET
+			email = COALESCE($2, email),
+			country = COALESCE($3, country),
+			gender = COALESCE($4, gender),
+			birth_year = COALESCE($5, birth_year)
+		WHERE id = $1
+		RETURNING id, email, country, gender, birth_year, created_at
+	`
+
+	exec := tx.Executor(ctx, r.pool)
+	var out models.User
+	err := exec.QueryRow(
+		ctx,
+		query,
+		id,
+		patch.Email,
+		patch.Country,
+		patch.Gender,
+		patch.BirthYear,
+	).Scan(
+		&out.ID,
+		&out.Email,
+		&out.Country,
+		&out.Gender,
+		&out.BirthYear,
+		&out.CreatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return models.User{}, models.ErrUserNotFound
+		}
+		if isUniqueViolation(err) {
+			return models.User{}, models.ErrEmailAlreadyExists
+		}
+		return models.User{}, err
+	}
+
+	return out, nil
 }
 
 func isUniqueViolation(err error) bool {

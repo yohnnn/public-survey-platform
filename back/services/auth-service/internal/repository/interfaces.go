@@ -12,6 +12,14 @@ type UserRepository interface {
 	GetByID(ctx context.Context, id string) (models.User, error)
 	GetByEmail(ctx context.Context, email string) (models.User, error)
 	ExistsByEmail(ctx context.Context, email string) (bool, error)
+	Update(ctx context.Context, id string, patch UserUpdatePatch) (models.User, error)
+}
+
+type UserUpdatePatch struct {
+	Email     *string
+	Country   *string
+	Gender    *string
+	BirthYear *int32
 }
 
 type SessionRepository interface {

@@ -348,6 +348,58 @@ func (x *GetUserPollsRequest) GetLimit() uint32 {
 	return 0
 }
 
+type GetMyPollsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Cursor        string                 `protobuf:"bytes,1,opt,name=cursor,proto3" json:"cursor,omitempty"`
+	Limit         uint32                 `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetMyPollsRequest) Reset() {
+	*x = GetMyPollsRequest{}
+	mi := &file_feed_v1_feed_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetMyPollsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetMyPollsRequest) ProtoMessage() {}
+
+func (x *GetMyPollsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_feed_v1_feed_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetMyPollsRequest.ProtoReflect.Descriptor instead.
+func (*GetMyPollsRequest) Descriptor() ([]byte, []int) {
+	return file_feed_v1_feed_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *GetMyPollsRequest) GetCursor() string {
+	if x != nil {
+		return x.Cursor
+	}
+	return ""
+}
+
+func (x *GetMyPollsRequest) GetLimit() uint32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
 type GetFeedResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Items         []*FeedItem            `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
@@ -358,7 +410,7 @@ type GetFeedResponse struct {
 
 func (x *GetFeedResponse) Reset() {
 	*x = GetFeedResponse{}
-	mi := &file_feed_v1_feed_proto_msgTypes[5]
+	mi := &file_feed_v1_feed_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -370,7 +422,7 @@ func (x *GetFeedResponse) String() string {
 func (*GetFeedResponse) ProtoMessage() {}
 
 func (x *GetFeedResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_feed_v1_feed_proto_msgTypes[5]
+	mi := &file_feed_v1_feed_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -383,7 +435,7 @@ func (x *GetFeedResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFeedResponse.ProtoReflect.Descriptor instead.
 func (*GetFeedResponse) Descriptor() ([]byte, []int) {
-	return file_feed_v1_feed_proto_rawDescGZIP(), []int{5}
+	return file_feed_v1_feed_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GetFeedResponse) GetItems() []*FeedItem {
@@ -410,7 +462,7 @@ type GetTrendingResponse struct {
 
 func (x *GetTrendingResponse) Reset() {
 	*x = GetTrendingResponse{}
-	mi := &file_feed_v1_feed_proto_msgTypes[6]
+	mi := &file_feed_v1_feed_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -422,7 +474,7 @@ func (x *GetTrendingResponse) String() string {
 func (*GetTrendingResponse) ProtoMessage() {}
 
 func (x *GetTrendingResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_feed_v1_feed_proto_msgTypes[6]
+	mi := &file_feed_v1_feed_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -435,7 +487,7 @@ func (x *GetTrendingResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTrendingResponse.ProtoReflect.Descriptor instead.
 func (*GetTrendingResponse) Descriptor() ([]byte, []int) {
-	return file_feed_v1_feed_proto_rawDescGZIP(), []int{6}
+	return file_feed_v1_feed_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *GetTrendingResponse) GetItems() []*FeedItem {
@@ -462,7 +514,7 @@ type GetUserPollsResponse struct {
 
 func (x *GetUserPollsResponse) Reset() {
 	*x = GetUserPollsResponse{}
-	mi := &file_feed_v1_feed_proto_msgTypes[7]
+	mi := &file_feed_v1_feed_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -474,7 +526,7 @@ func (x *GetUserPollsResponse) String() string {
 func (*GetUserPollsResponse) ProtoMessage() {}
 
 func (x *GetUserPollsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_feed_v1_feed_proto_msgTypes[7]
+	mi := &file_feed_v1_feed_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -487,7 +539,7 @@ func (x *GetUserPollsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserPollsResponse.ProtoReflect.Descriptor instead.
 func (*GetUserPollsResponse) Descriptor() ([]byte, []int) {
-	return file_feed_v1_feed_proto_rawDescGZIP(), []int{7}
+	return file_feed_v1_feed_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *GetUserPollsResponse) GetItems() []*FeedItem {
@@ -535,7 +587,10 @@ const file_feed_v1_feed_proto_rawDesc = "" +
 	"\x13GetUserPollsRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x16\n" +
 	"\x06cursor\x18\x02 \x01(\tR\x06cursor\x12\x14\n" +
-	"\x05limit\x18\x03 \x01(\rR\x05limit\"i\n" +
+	"\x05limit\x18\x03 \x01(\rR\x05limit\"A\n" +
+	"\x11GetMyPollsRequest\x12\x16\n" +
+	"\x06cursor\x18\x01 \x01(\tR\x06cursor\x12\x14\n" +
+	"\x05limit\x18\x02 \x01(\rR\x05limit\"i\n" +
 	"\x0fGetFeedResponse\x12'\n" +
 	"\x05items\x18\x01 \x03(\v2\x11.feed.v1.FeedItemR\x05items\x12-\n" +
 	"\x04page\x18\x02 \x01(\v2\x19.common.v1.CursorPageMetaR\x04page\"m\n" +
@@ -544,12 +599,14 @@ const file_feed_v1_feed_proto_rawDesc = "" +
 	"\x04page\x18\x02 \x01(\v2\x19.common.v1.CursorPageMetaR\x04page\"n\n" +
 	"\x14GetUserPollsResponse\x12'\n" +
 	"\x05items\x18\x01 \x03(\v2\x11.feed.v1.FeedItemR\x05items\x12-\n" +
-	"\x04page\x18\x02 \x01(\v2\x19.common.v1.CursorPageMetaR\x04page2\xb0\x02\n" +
+	"\x04page\x18\x02 \x01(\v2\x19.common.v1.CursorPageMetaR\x04page2\xac\x03\n" +
 	"\vFeedService\x12N\n" +
 	"\aGetFeed\x12\x17.feed.v1.GetFeedRequest\x1a\x18.feed.v1.GetFeedResponse\"\x10\x82\xd3\xe4\x93\x02\n" +
 	"\x12\b/v1/feed\x12c\n" +
-	"\vGetTrending\x12\x1b.feed.v1.GetTrendingRequest\x1a\x1c.feed.v1.GetTrendingResponse\"\x19\x82\xd3\xe4\x93\x02\x13\x12\x11/v1/feed/trending\x12l\n" +
-	"\fGetUserPolls\x12\x1c.feed.v1.GetUserPollsRequest\x1a\x1d.feed.v1.GetUserPollsResponse\"\x1f\x82\xd3\xe4\x93\x02\x19\x12\x17/v1/feed/user/{user_id}BIZGgithub.com/yohnnn/public-survey-platform/back/api/gen/go/feed/v1;feedv1b\x06proto3"
+	"\vGetTrending\x12\x1b.feed.v1.GetTrendingRequest\x1a\x1c.feed.v1.GetTrendingResponse\"\x19\x82\xd3\xe4\x93\x02\x13\x12\x11/v1/feed/trending\x12\x89\x01\n" +
+	"\fGetUserPolls\x12\x1c.feed.v1.GetUserPollsRequest\x1a\x1d.feed.v1.GetUserPollsResponse\"<\x82\xd3\xe4\x93\x026Z\x1b\x12\x19/v1/users/{user_id}/polls\x12\x17/v1/feed/user/{user_id}\x12\\\n" +
+	"\n" +
+	"GetMyPolls\x12\x1a.feed.v1.GetMyPollsRequest\x1a\x1d.feed.v1.GetUserPollsResponse\"\x13\x82\xd3\xe4\x93\x02\r\x12\v/v1/feed/meBIZGgithub.com/yohnnn/public-survey-platform/back/api/gen/go/feed/v1;feedv1b\x06proto3"
 
 var (
 	file_feed_v1_feed_proto_rawDescOnce sync.Once
@@ -563,36 +620,39 @@ func file_feed_v1_feed_proto_rawDescGZIP() []byte {
 	return file_feed_v1_feed_proto_rawDescData
 }
 
-var file_feed_v1_feed_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_feed_v1_feed_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_feed_v1_feed_proto_goTypes = []any{
 	(*FeedOption)(nil),            // 0: feed.v1.FeedOption
 	(*FeedItem)(nil),              // 1: feed.v1.FeedItem
 	(*GetFeedRequest)(nil),        // 2: feed.v1.GetFeedRequest
 	(*GetTrendingRequest)(nil),    // 3: feed.v1.GetTrendingRequest
 	(*GetUserPollsRequest)(nil),   // 4: feed.v1.GetUserPollsRequest
-	(*GetFeedResponse)(nil),       // 5: feed.v1.GetFeedResponse
-	(*GetTrendingResponse)(nil),   // 6: feed.v1.GetTrendingResponse
-	(*GetUserPollsResponse)(nil),  // 7: feed.v1.GetUserPollsResponse
-	(*timestamppb.Timestamp)(nil), // 8: google.protobuf.Timestamp
-	(*v1.CursorPageMeta)(nil),     // 9: common.v1.CursorPageMeta
+	(*GetMyPollsRequest)(nil),     // 5: feed.v1.GetMyPollsRequest
+	(*GetFeedResponse)(nil),       // 6: feed.v1.GetFeedResponse
+	(*GetTrendingResponse)(nil),   // 7: feed.v1.GetTrendingResponse
+	(*GetUserPollsResponse)(nil),  // 8: feed.v1.GetUserPollsResponse
+	(*timestamppb.Timestamp)(nil), // 9: google.protobuf.Timestamp
+	(*v1.CursorPageMeta)(nil),     // 10: common.v1.CursorPageMeta
 }
 var file_feed_v1_feed_proto_depIdxs = []int32{
 	0,  // 0: feed.v1.FeedItem.options:type_name -> feed.v1.FeedOption
-	8,  // 1: feed.v1.FeedItem.created_at:type_name -> google.protobuf.Timestamp
+	9,  // 1: feed.v1.FeedItem.created_at:type_name -> google.protobuf.Timestamp
 	1,  // 2: feed.v1.GetFeedResponse.items:type_name -> feed.v1.FeedItem
-	9,  // 3: feed.v1.GetFeedResponse.page:type_name -> common.v1.CursorPageMeta
+	10, // 3: feed.v1.GetFeedResponse.page:type_name -> common.v1.CursorPageMeta
 	1,  // 4: feed.v1.GetTrendingResponse.items:type_name -> feed.v1.FeedItem
-	9,  // 5: feed.v1.GetTrendingResponse.page:type_name -> common.v1.CursorPageMeta
+	10, // 5: feed.v1.GetTrendingResponse.page:type_name -> common.v1.CursorPageMeta
 	1,  // 6: feed.v1.GetUserPollsResponse.items:type_name -> feed.v1.FeedItem
-	9,  // 7: feed.v1.GetUserPollsResponse.page:type_name -> common.v1.CursorPageMeta
+	10, // 7: feed.v1.GetUserPollsResponse.page:type_name -> common.v1.CursorPageMeta
 	2,  // 8: feed.v1.FeedService.GetFeed:input_type -> feed.v1.GetFeedRequest
 	3,  // 9: feed.v1.FeedService.GetTrending:input_type -> feed.v1.GetTrendingRequest
 	4,  // 10: feed.v1.FeedService.GetUserPolls:input_type -> feed.v1.GetUserPollsRequest
-	5,  // 11: feed.v1.FeedService.GetFeed:output_type -> feed.v1.GetFeedResponse
-	6,  // 12: feed.v1.FeedService.GetTrending:output_type -> feed.v1.GetTrendingResponse
-	7,  // 13: feed.v1.FeedService.GetUserPolls:output_type -> feed.v1.GetUserPollsResponse
-	11, // [11:14] is the sub-list for method output_type
-	8,  // [8:11] is the sub-list for method input_type
+	5,  // 11: feed.v1.FeedService.GetMyPolls:input_type -> feed.v1.GetMyPollsRequest
+	6,  // 12: feed.v1.FeedService.GetFeed:output_type -> feed.v1.GetFeedResponse
+	7,  // 13: feed.v1.FeedService.GetTrending:output_type -> feed.v1.GetTrendingResponse
+	8,  // 14: feed.v1.FeedService.GetUserPolls:output_type -> feed.v1.GetUserPollsResponse
+	8,  // 15: feed.v1.FeedService.GetMyPolls:output_type -> feed.v1.GetUserPollsResponse
+	12, // [12:16] is the sub-list for method output_type
+	8,  // [8:12] is the sub-list for method input_type
 	8,  // [8:8] is the sub-list for extension type_name
 	8,  // [8:8] is the sub-list for extension extendee
 	0,  // [0:8] is the sub-list for field type_name
@@ -609,7 +669,7 @@ func file_feed_v1_feed_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_feed_v1_feed_proto_rawDesc), len(file_feed_v1_feed_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -22,6 +22,7 @@ const (
 	FeedService_GetFeed_FullMethodName      = "/feed.v1.FeedService/GetFeed"
 	FeedService_GetTrending_FullMethodName  = "/feed.v1.FeedService/GetTrending"
 	FeedService_GetUserPolls_FullMethodName = "/feed.v1.FeedService/GetUserPolls"
+	FeedService_GetMyPolls_FullMethodName   = "/feed.v1.FeedService/GetMyPolls"
 )
 
 // FeedServiceClient is the client API for FeedService service.
@@ -31,6 +32,7 @@ type FeedServiceClient interface {
 	GetFeed(ctx context.Context, in *GetFeedRequest, opts ...grpc.CallOption) (*GetFeedResponse, error)
 	GetTrending(ctx context.Context, in *GetTrendingRequest, opts ...grpc.CallOption) (*GetTrendingResponse, error)
 	GetUserPolls(ctx context.Context, in *GetUserPollsRequest, opts ...grpc.CallOption) (*GetUserPollsResponse, error)
+	GetMyPolls(ctx context.Context, in *GetMyPollsRequest, opts ...grpc.CallOption) (*GetUserPollsResponse, error)
 }
 
 type feedServiceClient struct {
@@ -71,6 +73,16 @@ func (c *feedServiceClient) GetUserPolls(ctx context.Context, in *GetUserPollsRe
 	return out, nil
 }
 
+func (c *feedServiceClient) GetMyPolls(ctx context.Context, in *GetMyPollsRequest, opts ...grpc.CallOption) (*GetUserPollsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetUserPollsResponse)
+	err := c.cc.Invoke(ctx, FeedService_GetMyPolls_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // FeedServiceServer is the server API for FeedService service.
 // All implementations must embed UnimplementedFeedServiceServer
 // for forward compatibility.
@@ -78,6 +90,7 @@ type FeedServiceServer interface {
 	GetFeed(context.Context, *GetFeedRequest) (*GetFeedResponse, error)
 	GetTrending(context.Context, *GetTrendingRequest) (*GetTrendingResponse, error)
 	GetUserPolls(context.Context, *GetUserPollsRequest) (*GetUserPollsResponse, error)
+	GetMyPolls(context.Context, *GetMyPollsRequest) (*GetUserPollsResponse, error)
 	mustEmbedUnimplementedFeedServiceServer()
 }
 
@@ -96,6 +109,9 @@ func (UnimplementedFeedServiceServer) GetTrending(context.Context, *GetTrendingR
 }
 func (UnimplementedFeedServiceServer) GetUserPolls(context.Context, *GetUserPollsRequest) (*GetUserPollsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetUserPolls not implemented")
+}
+func (UnimplementedFeedServiceServer) GetMyPolls(context.Context, *GetMyPollsRequest) (*GetUserPollsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetMyPolls not implemented")
 }
 func (UnimplementedFeedServiceServer) mustEmbedUnimplementedFeedServiceServer() {}
 func (UnimplementedFeedServiceServer) testEmbeddedByValue()                     {}
@@ -172,6 +188,24 @@ func _FeedService_GetUserPolls_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _FeedService_GetMyPolls_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetMyPollsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FeedServiceServer).GetMyPolls(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: FeedService_GetMyPolls_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FeedServiceServer).GetMyPolls(ctx, req.(*GetMyPollsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // FeedService_ServiceDesc is the grpc.ServiceDesc for FeedService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -190,6 +224,10 @@ var FeedService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetUserPolls",
 			Handler:    _FeedService_GetUserPolls_Handler,
+		},
+		{
+			MethodName: "GetMyPolls",
+			Handler:    _FeedService_GetMyPolls_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

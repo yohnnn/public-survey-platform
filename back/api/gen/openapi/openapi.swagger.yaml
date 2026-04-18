@@ -7,7 +7,6 @@ tags:
   - name: AuthService
   - name: FeedService
   - name: PollService
-  - name: RealtimeService
   - name: VoteService
 consumes:
   - application/json
@@ -88,6 +87,25 @@ paths:
             $ref: '#/definitions/rpcStatus'
       tags:
         - AuthService
+    patch:
+      operationId: AuthService_UpdateUser
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1UpdateUserResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: body
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/v1UpdateUserRequest'
+      tags:
+        - AuthService
   /v1/auth/refresh:
     post:
       operationId: AuthService_RefreshToken
@@ -161,6 +179,30 @@ paths:
           items:
             type: string
           collectionFormat: multi
+      tags:
+        - FeedService
+  /v1/feed/me:
+    get:
+      operationId: FeedService_GetMyPolls
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1GetUserPollsResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          type: string
+        - name: limit
+          in: query
+          required: false
+          type: integer
+          format: int64
       tags:
         - FeedService
   /v1/feed/trending:
@@ -517,31 +559,6 @@ paths:
             $ref: '#/definitions/VoteServiceVoteBody'
       tags:
         - VoteService
-  /v1/realtime/polls/{pollId}/stream:
-    get:
-      operationId: RealtimeService_StreamPollUpdates
-      responses:
-        "200":
-          description: A successful response.(streaming responses)
-          schema:
-            type: object
-            properties:
-              result:
-                $ref: '#/definitions/v1StreamPollUpdatesResponse'
-              error:
-                $ref: '#/definitions/rpcStatus'
-            title: Stream result of v1StreamPollUpdatesResponse
-        default:
-          description: An unexpected error response.
-          schema:
-            $ref: '#/definitions/rpcStatus'
-      parameters:
-        - name: pollId
-          in: path
-          required: true
-          type: string
-      tags:
-        - RealtimeService
   /v1/tags:
     get:
       operationId: PollService_ListTags
@@ -575,20 +592,34 @@ paths:
             $ref: '#/definitions/v1CreateTagRequest'
       tags:
         - PollService
-  /v1/ws:
+  /v1/users/{userId}/polls:
     get:
-      operationId: RealtimeService_WSHandshake
+      operationId: FeedService_GetUserPolls2
       responses:
         "200":
           description: A successful response.
           schema:
-            $ref: '#/definitions/v1WSHandshakeResponse'
+            $ref: '#/definitions/v1GetUserPollsResponse'
         default:
           description: An unexpected error response.
           schema:
             $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          type: string
+        - name: cursor
+          in: query
+          required: false
+          type: string
+        - name: limit
+          in: query
+          required: false
+          type: integer
+          format: int64
       tags:
-        - RealtimeService
+        - FeedService
 definitions:
   PollServiceUpdatePollBody:
     type: object
@@ -997,21 +1028,6 @@ definitions:
     properties:
       success:
         type: boolean
-  v1StreamPollUpdatesResponse:
-    type: object
-    properties:
-      event:
-        type: string
-      pollId:
-        type: string
-      optionId:
-        type: string
-      totalVotes:
-        type: string
-        format: int64
-      timestamp:
-        type: string
-        format: date-time
   v1Tag:
     type: object
     properties:
@@ -1027,6 +1043,23 @@ definitions:
     properties:
       poll:
         $ref: '#/definitions/v1Poll'
+  v1UpdateUserRequest:
+    type: object
+    properties:
+      email:
+        type: string
+      country:
+        type: string
+      gender:
+        type: string
+      birthYear:
+        type: integer
+        format: int32
+  v1UpdateUserResponse:
+    type: object
+    properties:
+      user:
+        $ref: '#/definitions/v1User'
   v1User:
     type: object
     properties:
@@ -1056,8 +1089,3 @@ definitions:
       votedAt:
         type: string
         format: date-time
-  v1WSHandshakeResponse:
-    type: object
-    properties:
-      connectionId:
-        type: string

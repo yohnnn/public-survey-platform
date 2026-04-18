@@ -5,4 +5,5 @@ import "errors"
 var (
 	ErrInvalidArgument  = errors.New("invalid argument")
 	ErrFeedItemNotFound = errors.New("feed item not found")
+	ErrUnauthorized     = errors.New("unauthorized")
 )

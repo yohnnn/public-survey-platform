@@ -9,6 +9,7 @@ import (
 var grpcErrorRules = []apperrors.GRPCRule{
 	{Target: models.ErrInvalidArgument, Code: codes.InvalidArgument},
 	{Target: models.ErrFeedItemNotFound, Code: codes.NotFound},
+	{Target: models.ErrUnauthorized, Code: codes.Unauthenticated},
 }
 
 func toStatusError(err error) error {

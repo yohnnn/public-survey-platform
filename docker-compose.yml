@@ -1,4 +1,13 @@
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: psp-redis
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.3
     container_name: psp-zookeeper
@@ -91,10 +100,13 @@ services:
     build:
       context: ./back
       dockerfile: services/auth-service/Dockerfile
-    env_file:
-      - ./back/services/auth-service/.env
     environment:
+      GRPC_ADDR: :50051
       DATABASE_URL: postgres://postgres:postgres@auth-postgres:5432/auth_service?sslmode=disable
+      JWT_SECRET: change-me-super-secret
+      ACCESS_TOKEN_TTL: 15m
+      REFRESH_TOKEN_TTL: 720h
+      BCRYPT_COST: 12
     ports:
       - "50051:50051"
     depends_on:
@@ -140,14 +152,19 @@ services:
     build:
       context: ./back
       dockerfile: services/poll-service/Dockerfile
-    env_file:
-      - ./back/services/poll-service/.env
     environment:
+      GRPC_ADDR: :50052
       DATABASE_URL: postgres://postgres:postgres@poll-postgres:5432/poll_service?sslmode=disable
       AUTH_GRPC_ENDPOINT: auth-service:50051
+      REDIS_ADDR: redis:6379
+      OUTBOX_RELAY_INTERVAL: 1s
+      OUTBOX_RELAY_BATCH_SIZE: 100
       EVENT_PUBLISHER: kafka
       KAFKA_BROKERS: kafka:9092
       KAFKA_TOPIC_PREFIX: ""
+      KAFKA_READ_TIMEOUT: 10s
+      KAFKA_COMMIT_PERIOD: 1s
+      KAFKA_GROUP_ID: poll-service
       KAFKA_WRITE_TIMEOUT: 5s
     ports:
       - "50052:50052"
@@ -198,12 +215,13 @@ services:
     build:
       context: ./back
       dockerfile: services/vote-service/Dockerfile
-    env_file:
-      - ./back/services/vote-service/.env
     environment:
+      GRPC_ADDR: :50053
       DATABASE_URL: postgres://postgres:postgres@vote-postgres:5432/vote_service?sslmode=disable
       AUTH_GRPC_ENDPOINT: auth-service:50051
       POLL_GRPC_ENDPOINT: poll-service:50052
+      OUTBOX_RELAY_INTERVAL: 1s
+      OUTBOX_RELAY_BATCH_SIZE: 100
       EVENT_PUBLISHER: kafka
       KAFKA_BROKERS: kafka:9092
       KAFKA_TOPIC_PREFIX: ""
@@ -259,12 +277,15 @@ services:
     build:
       context: ./back
       dockerfile: services/feed-service/Dockerfile
-    env_file:
-      - ./back/services/feed-service/.env
     environment:
+      GRPC_ADDR: :50054
       DATABASE_URL: postgres://postgres:postgres@feed-postgres:5432/feed_service?sslmode=disable
+      AUTH_GRPC_ENDPOINT: auth-service:50051
+      REDIS_ADDR: redis:6379
       KAFKA_BROKERS: kafka:9092
       KAFKA_TOPIC_PREFIX: ""
+      KAFKA_READ_TIMEOUT: 10s
+      KAFKA_COMMIT_PERIOD: 1s
       KAFKA_GROUP_ID: feed-service
     ports:
       - "50054:50054"
@@ -313,12 +334,14 @@ services:
     build:
       context: ./back
       dockerfile: services/analytics-service/Dockerfile
-    env_file:
-      - ./back/services/analytics-service/.env
     environment:
+      GRPC_ADDR: :50055
       DATABASE_URL: postgres://postgres:postgres@analytics-postgres:5432/analytics_service?sslmode=disable
+      REDIS_ADDR: redis:6379
       KAFKA_BROKERS: kafka:9092
       KAFKA_TOPIC_PREFIX: ""
+      KAFKA_READ_TIMEOUT: 10s
+      KAFKA_COMMIT_PERIOD: 1s
       KAFKA_GROUP_ID: analytics-service
     ports:
       - "50055:50055"
@@ -331,42 +354,19 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
-  realtime-service:
-    container_name: psp-realtime-service
-    build:
-      context: ./back
-      dockerfile: services/realtime-service/Dockerfile
-    env_file:
-      - ./back/services/realtime-service/.env
-    environment:
-      KAFKA_BROKERS: kafka:9092
-      KAFKA_TOPIC_PREFIX: ""
-      KAFKA_GROUP_ID: realtime-service
-      AUTH_GRPC_ENDPOINT: auth-service:50051
-      GRPC_ADDR: :50056
-      HTTP_ADDR: :8081
-    ports:
-      - "50056:50056"
-      - "8081:8081"
-    depends_on:
-      kafka-init:
-        condition: service_completed_successfully
-    restart: unless-stopped
-
   api-service:
     container_name: psp-api-service
     build:
       context: ./back
       dockerfile: services/api-service/Dockerfile
-    env_file:
-      - ./back/services/api-service/.env
     environment:
+      HTTP_ADDR: :8080
+      HTTP_PORT: 8080
       AUTH_GRPC_ENDPOINT: auth-service:50051
       POLL_GRPC_ENDPOINT: poll-service:50052
       VOTE_GRPC_ENDPOINT: vote-service:50053
       FEED_GRPC_ENDPOINT: feed-service:50054
       ANALYTICS_GRPC_ENDPOINT: analytics-service:50055
-      REALTIME_GRPC_ENDPOINT: realtime-service:50056
       ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000,http://localhost:8082,http://127.0.0.1:8082
     ports:
       - "8080:8080"
@@ -376,7 +376,6 @@ services:
       - vote-service
       - feed-service
       - analytics-service
-      - realtime-service
     restart: unless-stopped
 
   swagger-ui:
@@ -394,9 +393,101 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.52.1
+    container_name: psp-cadvisor
+    command:
+      - --housekeeping_interval=30s
+      - --docker_only=false
+      - --store_container_labels=true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    ports:
+      - "8081:8080"
+    privileged: true
+    restart: unless-stopped
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: psp-node-exporter
+    command:
+      - --path.rootfs=/host
+    volumes:
+      - /:/host:ro
+    ports:
+      - "9100:9100"
+    restart: unless-stopped
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.63.0
+    container_name: psp-redis-exporter
+    environment:
+      REDIS_ADDR: redis://redis:6379
+    ports:
+      - "9121:9121"
+    depends_on:
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.25.0
+    container_name: psp-blackbox-exporter
+    volumes:
+      - ./monitoring/blackbox/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+    command:
+      - --config.file=/etc/blackbox_exporter/config.yml
+    ports:
+      - "9115:9115"
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: psp-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --web.enable-lifecycle
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      - cadvisor
+      - node-exporter
+      - redis-exporter
+      - blackbox-exporter
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.1.4
+    container_name: psp-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
 volumes:
+  redis_data:
   auth_postgres_data:
   poll_postgres_data:
   vote_postgres_data:
   feed_postgres_data:
   analytics_postgres_data:
+  prometheus_data:
+  grafana_data:

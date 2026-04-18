@@ -8,6 +8,7 @@ import (
 
 	"github.com/yohnnn/public-survey-platform/back/pkg/tx"
 	"github.com/yohnnn/public-survey-platform/back/services/auth-service/internal/models"
+	"github.com/yohnnn/public-survey-platform/back/services/auth-service/internal/repository"
 	mocksvc "github.com/yohnnn/public-survey-platform/back/services/auth-service/internal/service/mock"
 	"go.uber.org/mock/gomock"
 )
@@ -210,5 +211,101 @@ func TestLogoutAndGuards(t *testing.T) {
 	_, err = svc.GetUser(context.Background(), "")
 	if !errors.Is(err, models.ErrUnauthorized) {
 		t.Fatalf("expected ErrUnauthorized, got %v", err)
+	}
+}
+
+func TestUpdateUserGuards(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	svc := newAuthServiceForTest(
+		mocksvc.NewMockUserRepository(ctrl),
+		mocksvc.NewMockSessionRepository(ctrl),
+		mocksvc.NewMockPasswordHasher(ctrl),
+		mocksvc.NewMockTokenManager(ctrl),
+		mocksvc.NewMockClock(ctrl),
+		mocksvc.NewMockIDGenerator(ctrl),
+	)
+
+	country := "RU"
+	_, err := svc.UpdateUser(context.Background(), "", UpdateUserInput{Country: &country})
+	if !errors.Is(err, models.ErrUnauthorized) {
+		t.Fatalf("expected ErrUnauthorized, got %v", err)
+	}
+
+	_, err = svc.UpdateUser(context.Background(), "u1", UpdateUserInput{})
+	if !errors.Is(err, models.ErrInvalidArgument) {
+		t.Fatalf("expected ErrInvalidArgument for empty payload, got %v", err)
+	}
+
+	email := "   "
+	_, err = svc.UpdateUser(context.Background(), "u1", UpdateUserInput{Email: &email})
+	if !errors.Is(err, models.ErrInvalidArgument) {
+		t.Fatalf("expected ErrInvalidArgument for empty email, got %v", err)
+	}
+
+	birthYear := int32(-1)
+	_, err = svc.UpdateUser(context.Background(), "u1", UpdateUserInput{BirthYear: &birthYear})
+	if !errors.Is(err, models.ErrInvalidArgument) {
+		t.Fatalf("expected ErrInvalidArgument for negative birth year, got %v", err)
+	}
+}
+
+func TestUpdateUserSuccess(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	users := mocksvc.NewMockUserRepository(ctrl)
+	users.EXPECT().Update(gomock.Any(), "u1", gomock.Any()).DoAndReturn(
+		func(_ context.Context, _ string, patch repository.UserUpdatePatch) (models.User, error) {
+			if patch.Email == nil || *patch.Email != "new@example.com" {
+				t.Fatalf("unexpected email patch: %#v", patch.Email)
+			}
+			if patch.Country == nil || *patch.Country != "RU" {
+				t.Fatalf("unexpected country patch: %#v", patch.Country)
+			}
+			if patch.Gender == nil || *patch.Gender != "female" {
+				t.Fatalf("unexpected gender patch: %#v", patch.Gender)
+			}
+			if patch.BirthYear == nil || *patch.BirthYear != 1997 {
+				t.Fatalf("unexpected birthYear patch: %#v", patch.BirthYear)
+			}
+
+			return models.User{
+				ID:        "u1",
+				Email:     *patch.Email,
+				Country:   *patch.Country,
+				Gender:    *patch.Gender,
+				BirthYear: *patch.BirthYear,
+			}, nil
+		},
+	)
+
+	svc := newAuthServiceForTest(
+		users,
+		mocksvc.NewMockSessionRepository(ctrl),
+		mocksvc.NewMockPasswordHasher(ctrl),
+		mocksvc.NewMockTokenManager(ctrl),
+		mocksvc.NewMockClock(ctrl),
+		mocksvc.NewMockIDGenerator(ctrl),
+	)
+
+	email := " New@Example.com "
+	country := " RU "
+	gender := " female "
+	birthYear := int32(1997)
+
+	user, err := svc.UpdateUser(context.Background(), "u1", UpdateUserInput{
+		Email:     &email,
+		Country:   &country,
+		Gender:    &gender,
+		BirthYear: &birthYear,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if user.ID != "u1" || user.Email != "new@example.com" {
+		t.Fatalf("unexpected updated user: %#v", user)
 	}
 }

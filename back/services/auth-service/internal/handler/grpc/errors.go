@@ -7,6 +7,7 @@ import (
 )
 
 var grpcErrorRules = []apperrors.GRPCRule{
+	{Target: models.ErrInvalidArgument, Code: codes.InvalidArgument},
 	{Target: models.ErrEmailAlreadyExists, Code: codes.AlreadyExists},
 	{Target: models.ErrInvalidCredentials, Code: codes.Unauthenticated},
 	{Target: models.ErrInvalidToken, Code: codes.Unauthenticated},

@@ -12,6 +12,9 @@ type Config struct {
 	GRPCAddr          string
 	DatabaseURL       string
 	AuthGRPCEndpoint  string
+	RedisAddr         string
+	RedisPassword     string
+	RedisDB           int
 	OutboxInterval    time.Duration
 	OutboxBatchSize   int
 	EventPublisher    string
@@ -28,6 +31,9 @@ func Load() (Config, error) {
 		GRPCAddr:          getEnv("GRPC_ADDR", ":50052"),
 		DatabaseURL:       strings.TrimSpace(getEnv("DATABASE_URL", "")),
 		AuthGRPCEndpoint:  strings.TrimSpace(getEnv("AUTH_GRPC_ENDPOINT", "")),
+		RedisAddr:         strings.TrimSpace(getEnv("REDIS_ADDR", "")),
+		RedisPassword:     getEnv("REDIS_PASSWORD", ""),
+		RedisDB:           getEnvInt("REDIS_DB", 0),
 		OutboxInterval:    getEnvDuration("OUTBOX_RELAY_INTERVAL", time.Second),
 		OutboxBatchSize:   getEnvInt("OUTBOX_RELAY_BATCH_SIZE", 100),
 		EventPublisher:    strings.ToLower(strings.TrimSpace(getEnv("EVENT_PUBLISHER", "log"))),

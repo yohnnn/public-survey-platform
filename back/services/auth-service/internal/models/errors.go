@@ -3,6 +3,7 @@ package models
 import "errors"
 
 var (
+	ErrInvalidArgument    = errors.New("invalid argument")
 	ErrUserNotFound       = errors.New("user not found")
 	ErrEmailAlreadyExists = errors.New("email already exists")
 	ErrInvalidCredentials = errors.New("invalid credentials")

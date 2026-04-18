@@ -15,6 +15,14 @@ type AuthService interface {
 	LogoutAll(ctx context.Context, userID string) error
 	ValidateToken(ctx context.Context, accessToken string) (string, error)
 	GetUser(ctx context.Context, userID string) (models.User, error)
+	UpdateUser(ctx context.Context, userID string, input UpdateUserInput) (models.User, error)
+}
+
+type UpdateUserInput struct {
+	Email     *string
+	Country   *string
+	Gender    *string
+	BirthYear *int32
 }
 
 type AuthTokens struct {

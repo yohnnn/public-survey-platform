@@ -7,7 +7,6 @@ tags:
   - name: AuthService
   - name: FeedService
   - name: PollService
-  - name: RealtimeService
   - name: VoteService
 consumes:
   - application/json
@@ -22,7 +21,7 @@ securityDefinitions:
     type: apiKey
     name: Authorization
     in: header
-    description: 'JWT access token. In Swagger Authorize paste exactly: Bearer <access_token> (without Bearer you will get 401).'
+    description: "JWT access token. Example: Bearer <token>"
 security:
   - BearerAuth: []
 paths:
@@ -100,6 +99,25 @@ paths:
             $ref: '#/definitions/rpcStatus'
       tags:
         - AuthService
+    patch:
+      operationId: AuthService_UpdateUser
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1UpdateUserResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: body
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/v1UpdateUserRequest'
+      tags:
+        - AuthService
   /v1/auth/refresh:
     post:
       operationId: AuthService_RefreshToken
@@ -173,6 +191,30 @@ paths:
           items:
             type: string
           collectionFormat: multi
+      tags:
+        - FeedService
+  /v1/feed/me:
+    get:
+      operationId: FeedService_GetMyPolls
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1GetUserPollsResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          type: string
+        - name: limit
+          in: query
+          required: false
+          type: integer
+          format: int64
       tags:
         - FeedService
   /v1/feed/trending:
@@ -529,31 +571,6 @@ paths:
             $ref: '#/definitions/VoteServiceVoteBody'
       tags:
         - VoteService
-  /v1/realtime/polls/{pollId}/stream:
-    get:
-      operationId: RealtimeService_StreamPollUpdates
-      responses:
-        "200":
-          description: A successful response.(streaming responses)
-          schema:
-            type: object
-            properties:
-              result:
-                $ref: '#/definitions/v1StreamPollUpdatesResponse'
-              error:
-                $ref: '#/definitions/rpcStatus'
-            title: Stream result of v1StreamPollUpdatesResponse
-        default:
-          description: An unexpected error response.
-          schema:
-            $ref: '#/definitions/rpcStatus'
-      parameters:
-        - name: pollId
-          in: path
-          required: true
-          type: string
-      tags:
-        - RealtimeService
   /v1/tags:
     get:
       operationId: PollService_ListTags
@@ -587,50 +604,54 @@ paths:
             $ref: '#/definitions/v1CreateTagRequest'
       tags:
         - PollService
-  /v1/ws:
+  /v1/users/{userId}/polls:
     get:
-      operationId: RealtimeService_WSHandshake
+      operationId: FeedService_GetUserPolls2
       responses:
         "200":
           description: A successful response.
           schema:
-            $ref: '#/definitions/v1WSHandshakeResponse'
+            $ref: '#/definitions/v1GetUserPollsResponse'
         default:
           description: An unexpected error response.
           schema:
             $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          type: string
+        - name: cursor
+          in: query
+          required: false
+          type: string
+        - name: limit
+          in: query
+          required: false
+          type: integer
+          format: int64
       tags:
-        - RealtimeService
+        - FeedService
 definitions:
   PollServiceUpdatePollBody:
     type: object
     properties:
       question:
         type: string
-        default: Какой формат релиз-нот вам удобнее?
       isAnonymous:
         type: boolean
-        default: false
       endsAt:
         type: string
         format: date-time
-        default: "2026-12-31T18:00:00Z"
       tags:
         type: array
-        default:
-          - product
-          - feedback
         items:
           type: string
   VoteServiceVoteBody:
     type: object
-    required:
-      - optionIds
     properties:
       optionIds:
         type: array
-        default:
-          - 5f5e100ab3a64b0f9f8f0a11
         items:
           type: string
   protobufAny:
@@ -680,36 +701,22 @@ definitions:
         format: int64
   v1CreatePollRequest:
     type: object
-    required:
-      - question
-      - type
-      - options
     properties:
       question:
         type: string
-        default: Какой формат релиз-нот вам удобнее?
       type:
         $ref: '#/definitions/v1PollType'
-        default: POLL_TYPE_SINGLE_CHOICE
       isAnonymous:
         type: boolean
-        default: true
       endsAt:
         type: string
         format: date-time
-        default: "2026-12-31T18:00:00Z"
       options:
         type: array
-        default:
-          - Только кратко
-          - Подробно с примерами
         items:
           type: string
       tags:
         type: array
-        default:
-          - product
-          - ux
         items:
           type: string
   v1CreatePollResponse:
@@ -719,12 +726,9 @@ definitions:
         $ref: '#/definitions/v1Poll'
   v1CreateTagRequest:
     type: object
-    required:
-      - name
     properties:
       name:
         type: string
-        default: product
   v1CreateTagResponse:
     type: object
     properties:
@@ -919,16 +923,11 @@ definitions:
           $ref: '#/definitions/v1Tag'
   v1LoginRequest:
     type: object
-    required:
-      - email
-      - password
     properties:
       email:
         type: string
-        default: user@example.com
       password:
         type: string
-        default: StrongPass123!
   v1LoginResponse:
     type: object
     properties:
@@ -943,12 +942,9 @@ definitions:
         type: boolean
   v1LogoutRequest:
     type: object
-    required:
-      - refreshToken
     properties:
       refreshToken:
         type: string
-        default: <refresh_token>
   v1LogoutResponse:
     type: object
     properties:
@@ -1005,7 +1001,6 @@ definitions:
         format: int64
   v1PollType:
     type: string
-    description: For creating polls use POLL_TYPE_SINGLE_CHOICE or POLL_TYPE_MULTIPLE_CHOICE.
     enum:
       - POLL_TYPE_UNSPECIFIED
       - POLL_TYPE_SINGLE_CHOICE
@@ -1013,12 +1008,9 @@ definitions:
     default: POLL_TYPE_UNSPECIFIED
   v1RefreshTokenRequest:
     type: object
-    required:
-      - refreshToken
     properties:
       refreshToken:
         type: string
-        default: <refresh_token>
   v1RefreshTokenResponse:
     type: object
     properties:
@@ -1026,26 +1018,18 @@ definitions:
         $ref: '#/definitions/v1AuthTokens'
   v1RegisterRequest:
     type: object
-    required:
-      - email
-      - password
     properties:
       email:
         type: string
-        default: user@example.com
       password:
         type: string
-        default: StrongPass123!
       country:
         type: string
-        default: RU
       gender:
         type: string
-        default: male
       birthYear:
         type: integer
         format: int32
-        default: 1998
   v1RegisterResponse:
     type: object
     properties:
@@ -1056,21 +1040,6 @@ definitions:
     properties:
       success:
         type: boolean
-  v1StreamPollUpdatesResponse:
-    type: object
-    properties:
-      event:
-        type: string
-      pollId:
-        type: string
-      optionId:
-        type: string
-      totalVotes:
-        type: string
-        format: int64
-      timestamp:
-        type: string
-        format: date-time
   v1Tag:
     type: object
     properties:
@@ -1086,6 +1055,23 @@ definitions:
     properties:
       poll:
         $ref: '#/definitions/v1Poll'
+  v1UpdateUserRequest:
+    type: object
+    properties:
+      email:
+        type: string
+      country:
+        type: string
+      gender:
+        type: string
+      birthYear:
+        type: integer
+        format: int32
+  v1UpdateUserResponse:
+    type: object
+    properties:
+      user:
+        $ref: '#/definitions/v1User'
   v1User:
     type: object
     properties:
@@ -1115,8 +1101,3 @@ definitions:
       votedAt:
         type: string
         format: date-time
-  v1WSHandshakeResponse:
-    type: object
-    properties:
-      connectionId:
-        type: string

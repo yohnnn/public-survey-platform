@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/yohnnn/public-survey-platform/back/pkg/cache/redisstore"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
@@ -28,6 +29,7 @@ import (
 	pollkafka "github.com/yohnnn/public-survey-platform/back/services/poll-service/internal/messaging/kafka"
 	"github.com/yohnnn/public-survey-platform/back/services/poll-service/internal/repository/postgres"
 	"github.com/yohnnn/public-survey-platform/back/services/poll-service/internal/service"
+	pollcache "github.com/yohnnn/public-survey-platform/back/services/poll-service/internal/service/cache"
 )
 
 func main() {
@@ -63,6 +65,25 @@ func main() {
 	idGen := service.NewRandomIDGenerator()
 
 	pollSvc := service.NewPollService(pollRepo, tagRepo, outboxRepo, *txMgr, clock, idGen)
+	if cfg.RedisAddr != "" {
+		cacheStore := redisstore.New(redisstore.Config{
+			Addr:     cfg.RedisAddr,
+			Password: cfg.RedisPassword,
+			DB:       cfg.RedisDB,
+		})
+
+		if pingErr := cacheStore.Ping(ctx); pingErr != nil {
+			logger.Printf("redis cache disabled: %v", pingErr)
+			_ = cacheStore.Close()
+		} else {
+			defer func() {
+				if closeErr := cacheStore.Close(); closeErr != nil {
+					logger.Printf("close redis cache store error: %v", closeErr)
+				}
+			}()
+			pollSvc = pollcache.NewPollService(pollSvc, cacheStore, pollcache.DefaultConfig())
+		}
+	}
 
 	var publisher events.Publisher = events.NewLogPublisher(logger)
 	if cfg.EventPublisher == "kafka" {
