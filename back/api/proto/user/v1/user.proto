@@ -1,0 +1,220 @@
+syntax = "proto3";
+
+package user.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/yohnnn/public-survey-platform/back/api/gen/go/user/v1;userv1";
+
+service UserService {
+  rpc Register(RegisterRequest) returns (RegisterResponse) {
+    option (google.api.http) = {
+      post: "/v1/auth/register"
+      body: "*"
+    };
+  }
+
+  rpc Login(LoginRequest) returns (LoginResponse) {
+    option (google.api.http) = {
+      post: "/v1/auth/login"
+      body: "*"
+    };
+  }
+
+  rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse) {
+    option (google.api.http) = {
+      post: "/v1/auth/refresh"
+      body: "*"
+    };
+  }
+
+  rpc Logout(LogoutRequest) returns (LogoutResponse) {
+    option (google.api.http) = {
+      post: "/v1/auth/logout"
+      body: "*"
+    };
+  }
+
+  rpc LogoutAll(LogoutAllRequest) returns (LogoutAllResponse) {
+    option (google.api.http) = {
+      post: "/v1/auth/logout-all"
+      body: "*"
+    };
+  }
+
+  rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
+
+  rpc GetMyUser(GetMyUserRequest) returns (GetMyUserResponse) {
+    option (google.api.http) = {
+      get: "/v1/users/me"
+    };
+  }
+
+  rpc UpdateMyUser(UpdateMyUserRequest) returns (UpdateMyUserResponse) {
+    option (google.api.http) = {
+      patch: "/v1/users/me"
+      body: "*"
+    };
+  }
+
+  rpc GetPublicProfile(GetPublicProfileRequest) returns (GetPublicProfileResponse) {
+    option (google.api.http) = {
+      get: "/v1/profiles/{user_id}"
+    };
+  }
+
+  rpc FollowUser(FollowUserRequest) returns (FollowUserResponse) {
+    option (google.api.http) = {
+      post: "/v1/users/{user_id}:follow"
+      body: "*"
+    };
+  }
+
+  rpc UnfollowUser(UnfollowUserRequest) returns (UnfollowUserResponse) {
+    option (google.api.http) = {
+      delete: "/v1/users/{user_id}:follow"
+    };
+  }
+
+  rpc ListMyFollowing(ListMyFollowingRequest) returns (ListMyFollowingResponse);
+  rpc BatchGetUserSummaries(BatchGetUserSummariesRequest) returns (BatchGetUserSummariesResponse);
+}
+
+message User {
+  string id = 1;
+  string nickname = 2;
+  string email = 3;
+  string country = 4;
+  string gender = 5;
+  int32 birth_year = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message PublicUserProfile {
+  string id = 1;
+  string nickname = 2;
+  int64 followers_count = 3;
+  int64 following_count = 4;
+  bool is_following = 5;
+}
+
+message UserSummary {
+  string id = 1;
+  string nickname = 2;
+}
+
+message RegisterRequest {
+  string email = 1;
+  string password = 2;
+  string nickname = 3;
+  string country = 4;
+  string gender = 5;
+  int32 birth_year = 6;
+}
+
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message RefreshTokenRequest {
+  string refresh_token = 1;
+}
+
+message LogoutRequest {
+  string refresh_token = 1;
+}
+
+message LogoutAllRequest {}
+
+message LogoutResponse {
+  bool success = 1;
+}
+
+message AuthTokens {
+  string access_token = 1;
+  string refresh_token = 2;
+  int64 expires_in_seconds = 3;
+}
+
+message RegisterResponse {
+  AuthTokens tokens = 1;
+}
+
+message LoginResponse {
+  AuthTokens tokens = 1;
+}
+
+message RefreshTokenResponse {
+  AuthTokens tokens = 1;
+}
+
+message ValidateTokenRequest {
+  string access_token = 1;
+}
+
+message ValidateTokenResponse {
+  bool valid = 1;
+  string user_id = 2;
+}
+
+message GetMyUserRequest {}
+
+message LogoutAllResponse {
+  bool success = 1;
+}
+
+message GetMyUserResponse {
+  User user = 1;
+}
+
+message UpdateMyUserRequest {
+  optional string email = 1;
+  optional string nickname = 2;
+  optional string country = 3;
+  optional string gender = 4;
+  optional int32 birth_year = 5;
+}
+
+message UpdateMyUserResponse {
+  User user = 1;
+}
+
+message GetPublicProfileRequest {
+  string user_id = 1;
+}
+
+message GetPublicProfileResponse {
+  PublicUserProfile profile = 1;
+}
+
+message FollowUserRequest {
+  string user_id = 1;
+}
+
+message FollowUserResponse {
+  bool success = 1;
+}
+
+message UnfollowUserRequest {
+  string user_id = 1;
+}
+
+message UnfollowUserResponse {
+  bool success = 1;
+}
+
+message ListMyFollowingRequest {}
+
+message ListMyFollowingResponse {
+  repeated string user_ids = 1;
+}
+
+message BatchGetUserSummariesRequest {
+  repeated string user_ids = 1;
+}
+
+message BatchGetUserSummariesResponse {
+  repeated UserSummary items = 1;
+}

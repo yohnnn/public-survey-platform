@@ -13,7 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	v1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/poll/v1"
+	pollv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/poll/v1"
 	gomock "go.uber.org/mock/gomock"
 	grpc "google.golang.org/grpc"
 )
@@ -43,14 +43,14 @@ func (m *MockPollServiceClient) EXPECT() *MockPollServiceClientMockRecorder {
 }
 
 // CreatePoll mocks base method.
-func (m *MockPollServiceClient) CreatePoll(ctx context.Context, in *v1.CreatePollRequest, opts ...grpc.CallOption) (*v1.CreatePollResponse, error) {
+func (m *MockPollServiceClient) CreatePoll(ctx context.Context, in *pollv1.CreatePollRequest, opts ...grpc.CallOption) (*pollv1.CreatePollResponse, error) {
 	m.ctrl.T.Helper()
 	varargs := []any{ctx, in}
 	for _, a := range opts {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "CreatePoll", varargs...)
-	ret0, _ := ret[0].(*v1.CreatePollResponse)
+	ret0, _ := ret[0].(*pollv1.CreatePollResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -62,15 +62,35 @@ func (mr *MockPollServiceClientMockRecorder) CreatePoll(ctx, in any, opts ...any
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreatePoll", reflect.TypeOf((*MockPollServiceClient)(nil).CreatePoll), varargs...)
 }
 
+// CreatePollImageUploadURL mocks base method.
+func (m *MockPollServiceClient) CreatePollImageUploadURL(ctx context.Context, in *pollv1.CreatePollImageUploadURLRequest, opts ...grpc.CallOption) (*pollv1.CreatePollImageUploadURLResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, in}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "CreatePollImageUploadURL", varargs...)
+	ret0, _ := ret[0].(*pollv1.CreatePollImageUploadURLResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreatePollImageUploadURL indicates an expected call of CreatePollImageUploadURL.
+func (mr *MockPollServiceClientMockRecorder) CreatePollImageUploadURL(ctx, in any, opts ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, in}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreatePollImageUploadURL", reflect.TypeOf((*MockPollServiceClient)(nil).CreatePollImageUploadURL), varargs...)
+}
+
 // CreateTag mocks base method.
-func (m *MockPollServiceClient) CreateTag(ctx context.Context, in *v1.CreateTagRequest, opts ...grpc.CallOption) (*v1.CreateTagResponse, error) {
+func (m *MockPollServiceClient) CreateTag(ctx context.Context, in *pollv1.CreateTagRequest, opts ...grpc.CallOption) (*pollv1.CreateTagResponse, error) {
 	m.ctrl.T.Helper()
 	varargs := []any{ctx, in}
 	for _, a := range opts {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "CreateTag", varargs...)
-	ret0, _ := ret[0].(*v1.CreateTagResponse)
+	ret0, _ := ret[0].(*pollv1.CreateTagResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -83,14 +103,14 @@ func (mr *MockPollServiceClientMockRecorder) CreateTag(ctx, in any, opts ...any)
 }
 
 // DeletePoll mocks base method.
-func (m *MockPollServiceClient) DeletePoll(ctx context.Context, in *v1.DeletePollRequest, opts ...grpc.CallOption) (*v1.DeletePollResponse, error) {
+func (m *MockPollServiceClient) DeletePoll(ctx context.Context, in *pollv1.DeletePollRequest, opts ...grpc.CallOption) (*pollv1.DeletePollResponse, error) {
 	m.ctrl.T.Helper()
 	varargs := []any{ctx, in}
 	for _, a := range opts {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "DeletePoll", varargs...)
-	ret0, _ := ret[0].(*v1.DeletePollResponse)
+	ret0, _ := ret[0].(*pollv1.DeletePollResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -103,14 +123,14 @@ func (mr *MockPollServiceClientMockRecorder) DeletePoll(ctx, in any, opts ...any
 }
 
 // GetPoll mocks base method.
-func (m *MockPollServiceClient) GetPoll(ctx context.Context, in *v1.GetPollRequest, opts ...grpc.CallOption) (*v1.GetPollResponse, error) {
+func (m *MockPollServiceClient) GetPoll(ctx context.Context, in *pollv1.GetPollRequest, opts ...grpc.CallOption) (*pollv1.GetPollResponse, error) {
 	m.ctrl.T.Helper()
 	varargs := []any{ctx, in}
 	for _, a := range opts {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "GetPoll", varargs...)
-	ret0, _ := ret[0].(*v1.GetPollResponse)
+	ret0, _ := ret[0].(*pollv1.GetPollResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -123,14 +143,14 @@ func (mr *MockPollServiceClientMockRecorder) GetPoll(ctx, in any, opts ...any) *
 }
 
 // ListPolls mocks base method.
-func (m *MockPollServiceClient) ListPolls(ctx context.Context, in *v1.ListPollsRequest, opts ...grpc.CallOption) (*v1.ListPollsResponse, error) {
+func (m *MockPollServiceClient) ListPolls(ctx context.Context, in *pollv1.ListPollsRequest, opts ...grpc.CallOption) (*pollv1.ListPollsResponse, error) {
 	m.ctrl.T.Helper()
 	varargs := []any{ctx, in}
 	for _, a := range opts {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "ListPolls", varargs...)
-	ret0, _ := ret[0].(*v1.ListPollsResponse)
+	ret0, _ := ret[0].(*pollv1.ListPollsResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -143,14 +163,14 @@ func (mr *MockPollServiceClientMockRecorder) ListPolls(ctx, in any, opts ...any)
 }
 
 // ListTags mocks base method.
-func (m *MockPollServiceClient) ListTags(ctx context.Context, in *v1.ListTagsRequest, opts ...grpc.CallOption) (*v1.ListTagsResponse, error) {
+func (m *MockPollServiceClient) ListTags(ctx context.Context, in *pollv1.ListTagsRequest, opts ...grpc.CallOption) (*pollv1.ListTagsResponse, error) {
 	m.ctrl.T.Helper()
 	varargs := []any{ctx, in}
 	for _, a := range opts {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "ListTags", varargs...)
-	ret0, _ := ret[0].(*v1.ListTagsResponse)
+	ret0, _ := ret[0].(*pollv1.ListTagsResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -163,14 +183,14 @@ func (mr *MockPollServiceClientMockRecorder) ListTags(ctx, in any, opts ...any) 
 }
 
 // UpdatePoll mocks base method.
-func (m *MockPollServiceClient) UpdatePoll(ctx context.Context, in *v1.UpdatePollRequest, opts ...grpc.CallOption) (*v1.UpdatePollResponse, error) {
+func (m *MockPollServiceClient) UpdatePoll(ctx context.Context, in *pollv1.UpdatePollRequest, opts ...grpc.CallOption) (*pollv1.UpdatePollResponse, error) {
 	m.ctrl.T.Helper()
 	varargs := []any{ctx, in}
 	for _, a := range opts {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "UpdatePoll", varargs...)
-	ret0, _ := ret[0].(*v1.UpdatePollResponse)
+	ret0, _ := ret[0].(*pollv1.UpdatePollResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

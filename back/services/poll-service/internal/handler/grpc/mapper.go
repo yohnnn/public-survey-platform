@@ -1,8 +1,6 @@
 package grpc
 
 import (
-	"time"
-
 	pollv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/poll/v1"
 	"github.com/yohnnn/public-survey-platform/back/services/poll-service/internal/models"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -10,18 +8,15 @@ import (
 
 func mapPoll(model models.Poll) *pollv1.Poll {
 	out := &pollv1.Poll{
-		Id:          model.ID,
-		CreatorId:   model.CreatorID,
-		Question:    model.Question,
-		Type:        pollv1.PollType(model.Type),
-		IsAnonymous: model.IsAnonymous,
-		CreatedAt:   timestamppb.New(model.CreatedAt),
-		TotalVotes:  model.TotalVotes,
-		Options:     mapOptions(model.Options),
-		Tags:        model.Tags,
-	}
-	if model.EndsAt != nil {
-		out.EndsAt = timestamppb.New(*model.EndsAt)
+		Id:         model.ID,
+		CreatorId:  model.CreatorID,
+		Question:   model.Question,
+		Type:       pollv1.PollType(model.Type),
+		ImageUrl:   model.ImageURL,
+		CreatedAt:  timestamppb.New(model.CreatedAt),
+		TotalVotes: model.TotalVotes,
+		Options:    mapOptions(model.Options),
+		Tags:       model.Tags,
 	}
 	return out
 }
@@ -60,15 +55,4 @@ func mapTags(items []models.Tag) []*pollv1.Tag {
 		out = append(out, mapTag(item))
 	}
 	return out
-}
-
-func timestampToTime(ts *timestamppb.Timestamp) (*time.Time, error) {
-	if ts == nil {
-		return nil, nil
-	}
-	if err := ts.CheckValid(); err != nil {
-		return nil, models.ErrInvalidArgument
-	}
-	v := ts.AsTime().UTC()
-	return &v, nil
 }

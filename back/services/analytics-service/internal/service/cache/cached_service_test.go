@@ -23,7 +23,7 @@ func TestGetPollAnalyticsSkipsCachingEmptySnapshot(t *testing.T) {
 	store := newInMemoryStore()
 	svc := NewAnalyticsService(next, store, Config{TTL: time.Minute})
 
-	first, err := svc.GetPollAnalytics(context.Background(), "poll-1", nil, nil, "")
+	first, err := svc.GetPollAnalytics(context.Background(), "poll-1")
 	if err != nil {
 		t.Fatalf("first call returned error: %v", err)
 	}
@@ -31,7 +31,7 @@ func TestGetPollAnalyticsSkipsCachingEmptySnapshot(t *testing.T) {
 		t.Fatalf("first call totalVotes=%d, want 0", first.TotalVotes)
 	}
 
-	second, err := svc.GetPollAnalytics(context.Background(), "poll-1", nil, nil, "")
+	second, err := svc.GetPollAnalytics(context.Background(), "poll-1")
 	if err != nil {
 		t.Fatalf("second call returned error: %v", err)
 	}
@@ -39,7 +39,7 @@ func TestGetPollAnalyticsSkipsCachingEmptySnapshot(t *testing.T) {
 		t.Fatalf("second call totalVotes=%d, want 1", second.TotalVotes)
 	}
 
-	third, err := svc.GetPollAnalytics(context.Background(), "poll-1", nil, nil, "")
+	third, err := svc.GetPollAnalytics(context.Background(), "poll-1")
 	if err != nil {
 		t.Fatalf("third call returned error: %v", err)
 	}
@@ -64,7 +64,7 @@ func TestGetCountryStatsSkipsCachingEmptySlice(t *testing.T) {
 	store := newInMemoryStore()
 	svc := NewAnalyticsService(next, store, Config{TTL: time.Minute})
 
-	first, err := svc.GetCountryStats(context.Background(), "poll-1", nil, nil, "")
+	first, err := svc.GetCountryStats(context.Background(), "poll-1")
 	if err != nil {
 		t.Fatalf("first call returned error: %v", err)
 	}
@@ -72,7 +72,7 @@ func TestGetCountryStatsSkipsCachingEmptySlice(t *testing.T) {
 		t.Fatalf("first call len=%d, want 0", len(first))
 	}
 
-	second, err := svc.GetCountryStats(context.Background(), "poll-1", nil, nil, "")
+	second, err := svc.GetCountryStats(context.Background(), "poll-1")
 	if err != nil {
 		t.Fatalf("second call returned error: %v", err)
 	}
@@ -81,7 +81,7 @@ func TestGetCountryStatsSkipsCachingEmptySlice(t *testing.T) {
 		t.Fatalf("second call mismatch: got=%#v want=%#v", second, expected)
 	}
 
-	third, err := svc.GetCountryStats(context.Background(), "poll-1", nil, nil, "")
+	third, err := svc.GetCountryStats(context.Background(), "poll-1")
 	if err != nil {
 		t.Fatalf("third call returned error: %v", err)
 	}
@@ -106,7 +106,7 @@ type stubAnalyticsService struct {
 	ageCalls     int
 }
 
-func (s *stubAnalyticsService) GetPollAnalytics(_ context.Context, _ string, _, _ *time.Time, _ string) (models.PollAnalytics, error) {
+func (s *stubAnalyticsService) GetPollAnalytics(_ context.Context, _ string) (models.PollAnalytics, error) {
 	s.pollCalls++
 	if len(s.pollResults) == 0 {
 		return models.PollAnalytics{}, nil
@@ -118,7 +118,7 @@ func (s *stubAnalyticsService) GetPollAnalytics(_ context.Context, _ string, _, 
 	return s.pollResults[idx], nil
 }
 
-func (s *stubAnalyticsService) GetCountryStats(_ context.Context, _ string, _, _ *time.Time, _ string) ([]models.CountryStat, error) {
+func (s *stubAnalyticsService) GetCountryStats(_ context.Context, _ string) ([]models.CountryStat, error) {
 	s.countryCalls++
 	if len(s.countryResults) == 0 {
 		return nil, nil
@@ -130,7 +130,7 @@ func (s *stubAnalyticsService) GetCountryStats(_ context.Context, _ string, _, _
 	return s.countryResults[idx], nil
 }
 
-func (s *stubAnalyticsService) GetGenderStats(_ context.Context, _ string, _, _ *time.Time, _ string) ([]models.GenderStat, error) {
+func (s *stubAnalyticsService) GetGenderStats(_ context.Context, _ string) ([]models.GenderStat, error) {
 	s.genderCalls++
 	if len(s.genderResults) == 0 {
 		return nil, nil
@@ -142,7 +142,7 @@ func (s *stubAnalyticsService) GetGenderStats(_ context.Context, _ string, _, _ 
 	return s.genderResults[idx], nil
 }
 
-func (s *stubAnalyticsService) GetAgeStats(_ context.Context, _ string, _, _ *time.Time, _ string) ([]models.AgeStat, error) {
+func (s *stubAnalyticsService) GetAgeStats(_ context.Context, _ string) ([]models.AgeStat, error) {
 	s.ageCalls++
 	if len(s.ageResults) == 0 {
 		return nil, nil

@@ -8,6 +8,37 @@ services:
     volumes:
       - redis_data:/data
 
+  minio:
+    image: minio/minio:latest
+    container_name: psp-minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    restart: unless-stopped
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: psp-minio-init
+    depends_on:
+      minio:
+        condition: service_started
+    entrypoint: >
+      /bin/sh -c '
+      until mc alias set local http://minio:9000 minioadmin minioadmin; do
+        echo "waiting for minio...";
+        sleep 1;
+      done &&
+      mc mb --ignore-existing local/poll-images &&
+      mc anonymous set download local/poll-images
+      '
+    restart: "no"
+
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.3
     container_name: psp-zookeeper
@@ -64,9 +95,9 @@ services:
         kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic vote.removed --replication-factor 1 --partitions 3
     restart: "no"
 
-  auth-postgres:
+  user-postgres:
     image: postgres:16-alpine
-    container_name: psp-auth-postgres
+    container_name: psp-user-postgres
     environment:
       POSTGRES_DB: auth_service
       POSTGRES_USER: postgres
@@ -81,28 +112,28 @@ services:
       timeout: 3s
       retries: 20
 
-  auth-migrate:
+  user-migrate:
     image: migrate/migrate:v4.18.3
-    container_name: psp-auth-migrate
+    container_name: psp-user-migrate
     volumes:
-      - ./back/services/auth-service/migrations:/migrations
+      - ./back/services/user-service/migrations:/migrations
     depends_on:
-      auth-postgres:
+      user-postgres:
         condition: service_healthy
     command:
       - -path=/migrations
-      - -database=postgres://postgres:postgres@auth-postgres:5432/auth_service?sslmode=disable
+      - -database=postgres://postgres:postgres@user-postgres:5432/auth_service?sslmode=disable
       - up
     restart: "no"
 
-  auth-service:
-    container_name: psp-auth-service
+  user-service:
+    container_name: psp-user-service
     build:
       context: ./back
-      dockerfile: services/auth-service/Dockerfile
+      dockerfile: services/user-service/Dockerfile
     environment:
       GRPC_ADDR: :50051
-      DATABASE_URL: postgres://postgres:postgres@auth-postgres:5432/auth_service?sslmode=disable
+      DATABASE_URL: postgres://postgres:postgres@user-postgres:5432/auth_service?sslmode=disable
       JWT_SECRET: change-me-super-secret
       ACCESS_TOKEN_TTL: 15m
       REFRESH_TOKEN_TTL: 720h
@@ -110,9 +141,9 @@ services:
     ports:
       - "50051:50051"
     depends_on:
-      auth-postgres:
+      user-postgres:
         condition: service_healthy
-      auth-migrate:
+      user-migrate:
         condition: service_completed_successfully
     restart: unless-stopped
 
@@ -155,7 +186,7 @@ services:
     environment:
       GRPC_ADDR: :50052
       DATABASE_URL: postgres://postgres:postgres@poll-postgres:5432/poll_service?sslmode=disable
-      AUTH_GRPC_ENDPOINT: auth-service:50051
+      USER_GRPC_ENDPOINT: user-service:50051
       REDIS_ADDR: redis:6379
       OUTBOX_RELAY_INTERVAL: 1s
       OUTBOX_RELAY_BATCH_SIZE: 100
@@ -166,6 +197,14 @@ services:
       KAFKA_COMMIT_PERIOD: 1s
       KAFKA_GROUP_ID: poll-service
       KAFKA_WRITE_TIMEOUT: 5s
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: poll-images
+      MINIO_USE_SSL: "false"
+      MINIO_PUBLIC_BASE_URL: http://localhost:9000/poll-images
+      MINIO_PRESIGN_TTL: 15m
+      MINIO_MAX_FILE_BYTES: 10485760
     ports:
       - "50052:50052"
     depends_on:
@@ -173,9 +212,11 @@ services:
         condition: service_healthy
       poll-migrate:
         condition: service_completed_successfully
-      auth-service:
+      user-service:
         condition: service_started
       kafka-init:
+        condition: service_completed_successfully
+      minio-init:
         condition: service_completed_successfully
     restart: unless-stopped
 
@@ -218,7 +259,7 @@ services:
     environment:
       GRPC_ADDR: :50053
       DATABASE_URL: postgres://postgres:postgres@vote-postgres:5432/vote_service?sslmode=disable
-      AUTH_GRPC_ENDPOINT: auth-service:50051
+      USER_GRPC_ENDPOINT: user-service:50051
       POLL_GRPC_ENDPOINT: poll-service:50052
       OUTBOX_RELAY_INTERVAL: 1s
       OUTBOX_RELAY_BATCH_SIZE: 100
@@ -233,7 +274,7 @@ services:
         condition: service_healthy
       vote-migrate:
         condition: service_completed_successfully
-      auth-service:
+      user-service:
         condition: service_started
       poll-service:
         condition: service_started
@@ -280,7 +321,7 @@ services:
     environment:
       GRPC_ADDR: :50054
       DATABASE_URL: postgres://postgres:postgres@feed-postgres:5432/feed_service?sslmode=disable
-      AUTH_GRPC_ENDPOINT: auth-service:50051
+      USER_GRPC_ENDPOINT: user-service:50051
       REDIS_ADDR: redis:6379
       KAFKA_BROKERS: kafka:9092
       KAFKA_TOPIC_PREFIX: ""
@@ -362,7 +403,7 @@ services:
     environment:
       HTTP_ADDR: :8080
       HTTP_PORT: 8080
-      AUTH_GRPC_ENDPOINT: auth-service:50051
+      USER_GRPC_ENDPOINT: user-service:50051
       POLL_GRPC_ENDPOINT: poll-service:50052
       VOTE_GRPC_ENDPOINT: vote-service:50053
       FEED_GRPC_ENDPOINT: feed-service:50054
@@ -371,7 +412,7 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - auth-service
+      - user-service
       - poll-service
       - vote-service
       - feed-service
@@ -393,101 +434,11 @@ services:
         condition: service_started
     restart: unless-stopped
 
-  cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.52.1
-    container_name: psp-cadvisor
-    command:
-      - --housekeeping_interval=30s
-      - --docker_only=false
-      - --store_container_labels=true
-    volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:rw
-      - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
-    ports:
-      - "8081:8080"
-    privileged: true
-    restart: unless-stopped
-
-  node-exporter:
-    image: prom/node-exporter:v1.8.2
-    container_name: psp-node-exporter
-    command:
-      - --path.rootfs=/host
-    volumes:
-      - /:/host:ro
-    ports:
-      - "9100:9100"
-    restart: unless-stopped
-
-  redis-exporter:
-    image: oliver006/redis_exporter:v1.63.0
-    container_name: psp-redis-exporter
-    environment:
-      REDIS_ADDR: redis://redis:6379
-    ports:
-      - "9121:9121"
-    depends_on:
-      redis:
-        condition: service_started
-    restart: unless-stopped
-
-  blackbox-exporter:
-    image: prom/blackbox-exporter:v0.25.0
-    container_name: psp-blackbox-exporter
-    volumes:
-      - ./monitoring/blackbox/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
-    command:
-      - --config.file=/etc/blackbox_exporter/config.yml
-    ports:
-      - "9115:9115"
-    restart: unless-stopped
-
-  prometheus:
-    image: prom/prometheus:v2.54.1
-    container_name: psp-prometheus
-    command:
-      - --config.file=/etc/prometheus/prometheus.yml
-      - --storage.tsdb.path=/prometheus
-      - --storage.tsdb.retention.time=15d
-      - --web.enable-lifecycle
-    volumes:
-      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
-      - prometheus_data:/prometheus
-    ports:
-      - "9090:9090"
-    depends_on:
-      - cadvisor
-      - node-exporter
-      - redis-exporter
-      - blackbox-exporter
-    restart: unless-stopped
-
-  grafana:
-    image: grafana/grafana:11.1.4
-    container_name: psp-grafana
-    environment:
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: admin
-      GF_USERS_ALLOW_SIGN_UP: "false"
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
-    ports:
-      - "3001:3000"
-    depends_on:
-      - prometheus
-    restart: unless-stopped
-
 volumes:
   redis_data:
+  minio_data:
   auth_postgres_data:
   poll_postgres_data:
   vote_postgres_data:
   feed_postgres_data:
   analytics_postgres_data:
-  prometheus_data:
-  grafana_data:

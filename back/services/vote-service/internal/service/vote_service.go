@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	authv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/auth/v1"
 	pollv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/poll/v1"
+	userv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/user/v1"
 	"github.com/yohnnn/public-survey-platform/back/pkg/events"
 	"github.com/yohnnn/public-survey-platform/back/pkg/outbox"
 	"github.com/yohnnn/public-survey-platform/back/pkg/tx"
@@ -24,13 +24,13 @@ import (
 type voteService struct {
 	repo       repository.VoteRepository
 	outbox     repository.OutboxRepository
-	authClient authv1.AuthServiceClient
+	authClient userv1.UserServiceClient
 	pollClient pollv1.PollServiceClient
 	tx         tx.Manager
 	clock      Clock
 }
 
-func NewVoteService(repo repository.VoteRepository, outbox repository.OutboxRepository, authClient authv1.AuthServiceClient, pollClient pollv1.PollServiceClient, tx tx.Manager, clock Clock) VoteService {
+func NewVoteService(repo repository.VoteRepository, outbox repository.OutboxRepository, authClient userv1.UserServiceClient, pollClient pollv1.PollServiceClient, tx tx.Manager, clock Clock) VoteService {
 	return &voteService{repo: repo, outbox: outbox, authClient: authClient, pollClient: pollClient, tx: tx, clock: clock}
 }
 
@@ -359,7 +359,7 @@ func (s *voteService) getVoterMeta(ctx context.Context) voterMeta {
 	outMD := metadata.Pairs("authorization", authVals[0])
 	outCtx := metadata.NewOutgoingContext(ctx, outMD)
 
-	resp, err := s.authClient.GetUser(outCtx, &authv1.GetUserRequest{})
+	resp, err := s.authClient.GetMyUser(outCtx, &userv1.GetMyUserRequest{})
 	if err != nil || resp.GetUser() == nil {
 		return voterMeta{}
 	}

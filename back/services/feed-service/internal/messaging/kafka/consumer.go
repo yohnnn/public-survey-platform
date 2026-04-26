@@ -67,6 +67,7 @@ func (c *FeedConsumer) handlePollCreated(ctx context.Context, msg events.Message
 		ID:        pollID,
 		CreatorID: payload.CreatorID,
 		Question:  payload.Question,
+		ImageURL:  strings.TrimSpace(payload.ImageURL),
 		CreatedAt: payload.CreatedAt,
 	}
 
@@ -79,7 +80,11 @@ func (c *FeedConsumer) handlePollCreated(ctx context.Context, msg events.Message
 			return nil
 		}
 
-		return c.repo.CreateFeedItem(txCtx, item, options, payload.Tags)
+		if err := c.repo.CreateFeedItem(txCtx, item, options, payload.Tags); err != nil {
+			return err
+		}
+
+		return c.repo.ApplyPendingVotes(txCtx, pollID)
 	})
 }
 
@@ -98,6 +103,7 @@ func (c *FeedConsumer) handlePollUpdated(ctx context.Context, msg events.Message
 	item := models.FeedItem{
 		ID:       pollID,
 		Question: payload.Question,
+		ImageURL: strings.TrimSpace(payload.ImageURL),
 	}
 
 	return c.tx.WithTx(ctx, func(txCtx context.Context) error {
@@ -163,11 +169,24 @@ func (c *FeedConsumer) handleVoteCast(ctx context.Context, msg events.Message) e
 		}
 
 		for _, optionID := range optionIDs {
-			if err := c.repo.IncrementOptionVotes(txCtx, optionID, 1); err != nil {
+			applied, err := c.repo.IncrementOptionVotes(txCtx, optionID, 1)
+			if err != nil {
 				return err
 			}
+			if !applied {
+				if err := c.repo.AddPendingOptionVotes(txCtx, pollID, optionID, 1); err != nil {
+					return err
+				}
+			}
 		}
-		return c.repo.UpdateTotalVotes(txCtx, pollID, delta)
+		applied, err := c.repo.UpdateTotalVotes(txCtx, pollID, delta)
+		if err != nil {
+			return err
+		}
+		if applied {
+			return nil
+		}
+		return c.repo.AddPendingTotalVotes(txCtx, pollID, delta)
 	})
 }
 
@@ -196,11 +215,24 @@ func (c *FeedConsumer) handleVoteRemoved(ctx context.Context, msg events.Message
 		}
 
 		for _, optionID := range optionIDs {
-			if err := c.repo.IncrementOptionVotes(txCtx, optionID, -1); err != nil {
+			applied, err := c.repo.IncrementOptionVotes(txCtx, optionID, -1)
+			if err != nil {
 				return err
 			}
+			if !applied {
+				if err := c.repo.AddPendingOptionVotes(txCtx, pollID, optionID, -1); err != nil {
+					return err
+				}
+			}
 		}
-		return c.repo.UpdateTotalVotes(txCtx, pollID, -delta)
+		applied, err := c.repo.UpdateTotalVotes(txCtx, pollID, -delta)
+		if err != nil {
+			return err
+		}
+		if applied {
+			return nil
+		}
+		return c.repo.AddPendingTotalVotes(txCtx, pollID, -delta)
 	})
 }
 

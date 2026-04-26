@@ -3,8 +3,6 @@ syntax = "proto3";
 package analytics.v1;
 
 import "google/api/annotations.proto";
-import "google/protobuf/timestamp.proto";
-
 option go_package = "github.com/yohnnn/public-survey-platform/back/api/gen/go/analytics/v1;analyticsv1";
 
 service AnalyticsService {
@@ -35,9 +33,6 @@ service AnalyticsService {
 
 message GetPollAnalyticsRequest {
   string poll_id = 1;
-  google.protobuf.Timestamp from = 2;
-  google.protobuf.Timestamp to = 3;
-  string interval = 4;
 }
 
 message OptionStat {
@@ -71,9 +66,6 @@ message GetPollAnalyticsResponse {
 
 message GetCountryStatsRequest {
   string poll_id = 1;
-  google.protobuf.Timestamp from = 2;
-  google.protobuf.Timestamp to = 3;
-  string interval = 4;
 }
 
 message GetCountryStatsResponse {
@@ -83,9 +75,6 @@ message GetCountryStatsResponse {
 
 message GetGenderStatsRequest {
   string poll_id = 1;
-  google.protobuf.Timestamp from = 2;
-  google.protobuf.Timestamp to = 3;
-  string interval = 4;
 }
 
 message GetGenderStatsResponse {
@@ -95,9 +84,6 @@ message GetGenderStatsResponse {
 
 message GetAgeStatsRequest {
   string poll_id = 1;
-  google.protobuf.Timestamp from = 2;
-  google.protobuf.Timestamp to = 3;
-  string interval = 4;
 }
 
 message GetAgeStatsResponse {

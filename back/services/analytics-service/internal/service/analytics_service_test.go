@@ -17,7 +17,7 @@ func TestGetPollAnalyticsRejectsEmptyPollID(t *testing.T) {
 
 	svc := NewAnalyticsService(mockrepo.NewMockAnalyticsRepository(ctrl))
 
-	_, err := svc.GetPollAnalytics(context.Background(), "", nil, nil, "")
+	_, err := svc.GetPollAnalytics(context.Background(), "")
 	if !errors.Is(err, models.ErrInvalidArgument) {
 		t.Fatalf("expected ErrInvalidArgument, got %v", err)
 	}
@@ -32,7 +32,7 @@ func TestGetPollAnalyticsPassesThroughRepositoryResult(t *testing.T) {
 	repo.EXPECT().GetPollAnalytics(gomock.Any(), "poll-1").Return(expected, nil)
 
 	svc := NewAnalyticsService(repo)
-	got, err := svc.GetPollAnalytics(context.Background(), "  poll-1  ", nil, nil, "")
+	got, err := svc.GetPollAnalytics(context.Background(), "  poll-1  ")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -47,7 +47,7 @@ func TestGetCountryStatsRejectsEmptyPollID(t *testing.T) {
 
 	svc := NewAnalyticsService(mockrepo.NewMockAnalyticsRepository(ctrl))
 
-	_, err := svc.GetCountryStats(context.Background(), " ", nil, nil, "")
+	_, err := svc.GetCountryStats(context.Background(), " ")
 	if !errors.Is(err, models.ErrInvalidArgument) {
 		t.Fatalf("expected ErrInvalidArgument, got %v", err)
 	}
@@ -62,7 +62,7 @@ func TestGetAgeStatsPassesThroughRepositoryResult(t *testing.T) {
 	repo.EXPECT().GetAgeStats(gomock.Any(), "poll-1").Return(expected, nil)
 
 	svc := NewAnalyticsService(repo)
-	got, err := svc.GetAgeStats(context.Background(), "poll-1", nil, nil, "")
+	got, err := svc.GetAgeStats(context.Background(), "poll-1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

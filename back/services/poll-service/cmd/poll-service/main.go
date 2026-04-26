@@ -17,8 +17,8 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
-	authv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/auth/v1"
 	pollv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/poll/v1"
+	userv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/user/v1"
 	"github.com/yohnnn/public-survey-platform/back/pkg/events"
 	"github.com/yohnnn/public-survey-platform/back/pkg/grpcinterceptor"
 	applogger "github.com/yohnnn/public-survey-platform/back/pkg/logger"
@@ -30,6 +30,7 @@ import (
 	"github.com/yohnnn/public-survey-platform/back/services/poll-service/internal/repository/postgres"
 	"github.com/yohnnn/public-survey-platform/back/services/poll-service/internal/service"
 	pollcache "github.com/yohnnn/public-survey-platform/back/services/poll-service/internal/service/cache"
+	minioUploader "github.com/yohnnn/public-survey-platform/back/services/poll-service/internal/storage/minio"
 )
 
 func main() {
@@ -50,12 +51,12 @@ func main() {
 	}
 	defer pool.Close()
 
-	authConn, err := grpc.NewClient(cfg.AuthGRPCEndpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	authConn, err := grpc.NewClient(cfg.UserGRPCEndpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		logger.Fatalf("connect to auth service: %v", err)
+		logger.Fatalf("connect to user service: %v", err)
 	}
 	defer authConn.Close()
-	authClient := authv1.NewAuthServiceClient(authConn)
+	authClient := userv1.NewUserServiceClient(authConn)
 
 	pollRepo := postgres.NewPollRepository(pool)
 	tagRepo := postgres.NewTagRepository(pool)
@@ -64,7 +65,25 @@ func main() {
 	clock := service.NewSystemClock()
 	idGen := service.NewRandomIDGenerator()
 
-	pollSvc := service.NewPollService(pollRepo, tagRepo, outboxRepo, *txMgr, clock, idGen)
+	var imageUploader service.PollImageUploader
+	if cfg.MinIOEndpoint != "" {
+		uploader, uploaderErr := minioUploader.NewUploader(minioUploader.Config{
+			Endpoint:     cfg.MinIOEndpoint,
+			AccessKey:    cfg.MinIOAccessKey,
+			SecretKey:    cfg.MinIOSecretKey,
+			Bucket:       cfg.MinIOBucket,
+			UseSSL:       cfg.MinIOUseSSL,
+			PublicBase:   cfg.MinIOPublicBase,
+			PresignTTL:   cfg.MinIOPresignTTL,
+			MaxFileBytes: cfg.MinIOMaxFileBytes,
+		})
+		if uploaderErr != nil {
+			logger.Fatalf("create minio uploader: %v", uploaderErr)
+		}
+		imageUploader = uploader
+	}
+
+	pollSvc := service.NewPollService(pollRepo, tagRepo, outboxRepo, *txMgr, clock, idGen, imageUploader)
 	if cfg.RedisAddr != "" {
 		cacheStore := redisstore.New(redisstore.Config{
 			Addr:     cfg.RedisAddr,
@@ -135,7 +154,7 @@ func main() {
 
 	authInterceptor := grpcinterceptor.UnaryAuthInterceptor(
 		func(ctx context.Context, token string) (string, error) {
-			resp, err := authClient.ValidateToken(ctx, &authv1.ValidateTokenRequest{AccessToken: token})
+			resp, err := authClient.ValidateToken(ctx, &userv1.ValidateTokenRequest{AccessToken: token})
 			if err != nil {
 				return "", err
 			}

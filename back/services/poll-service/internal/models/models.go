@@ -11,16 +11,22 @@ const (
 )
 
 type Poll struct {
-	ID          string
-	CreatorID   string
-	Question    string
-	Type        PollType
-	IsAnonymous bool
-	EndsAt      *time.Time
-	CreatedAt   time.Time
-	TotalVotes  int64
-	Options     []PollOption
-	Tags        []string
+	ID         string
+	CreatorID  string
+	Question   string
+	Type       PollType
+	ImageURL   string
+	CreatedAt  time.Time
+	TotalVotes int64
+	Options    []PollOption
+	Tags       []string
+}
+
+type PollImageUpload struct {
+	ObjectKey        string
+	UploadURL        string
+	ImageURL         string
+	ExpiresInSeconds int64
 }
 
 type PollOption struct {

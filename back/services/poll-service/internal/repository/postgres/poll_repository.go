@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -25,8 +24,8 @@ func NewPollRepository(pool *pgxpool.Pool) *PollRepository {
 
 func (r *PollRepository) Create(ctx context.Context, poll models.Poll, options []models.PollOption, tagIDs []string) error {
 	const insertPollQuery = `
-		INSERT INTO polls (id, creator_id, question, type, is_anonymous, ends_at, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO polls (id, creator_id, question, type, image_url, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
 	`
 
 	exec := tx.Executor(ctx, r.pool)
@@ -35,8 +34,7 @@ func (r *PollRepository) Create(ctx context.Context, poll models.Poll, options [
 		poll.CreatorID,
 		poll.Question,
 		poll.Type,
-		poll.IsAnonymous,
-		poll.EndsAt,
+		poll.ImageURL,
 		poll.CreatedAt,
 	); err != nil {
 		return err
@@ -70,7 +68,7 @@ func (r *PollRepository) Create(ctx context.Context, poll models.Poll, options [
 
 func (r *PollRepository) GetByID(ctx context.Context, id string) (models.Poll, error) {
 	const query = `
-		SELECT p.id, p.creator_id, p.question, p.type, p.is_anonymous, p.ends_at, p.created_at,
+		SELECT p.id, p.creator_id, p.question, p.type, p.image_url, p.created_at,
 		       COALESCE(SUM(po.votes_count), 0) AS total_votes
 		FROM polls p
 		LEFT JOIN poll_options po ON po.poll_id = p.id
@@ -80,14 +78,12 @@ func (r *PollRepository) GetByID(ctx context.Context, id string) (models.Poll, e
 
 	exec := tx.Executor(ctx, r.pool)
 	var out models.Poll
-	var endsAt *time.Time
 	err := exec.QueryRow(ctx, query, id).Scan(
 		&out.ID,
 		&out.CreatorID,
 		&out.Question,
 		&out.Type,
-		&out.IsAnonymous,
-		&endsAt,
+		&out.ImageURL,
 		&out.CreatedAt,
 		&out.TotalVotes,
 	)
@@ -97,8 +93,6 @@ func (r *PollRepository) GetByID(ctx context.Context, id string) (models.Poll, e
 		}
 		return models.Poll{}, err
 	}
-	out.EndsAt = endsAt
-
 	return out, nil
 }
 
@@ -108,7 +102,7 @@ func (r *PollRepository) List(ctx context.Context, filter repository.PollListFil
 	}
 
 	base := `
-		SELECT p.id, p.creator_id, p.question, p.type, p.is_anonymous, p.ends_at, p.created_at,
+		SELECT p.id, p.creator_id, p.question, p.type, p.image_url, p.created_at,
 		       COALESCE(SUM(po.votes_count), 0) AS total_votes
 		FROM polls p
 		LEFT JOIN poll_options po ON po.poll_id = p.id
@@ -153,20 +147,17 @@ func (r *PollRepository) List(ctx context.Context, filter repository.PollListFil
 	items := make([]models.Poll, 0, filter.Limit)
 	for rows.Next() {
 		var item models.Poll
-		var endsAt *time.Time
 		if scanErr := rows.Scan(
 			&item.ID,
 			&item.CreatorID,
 			&item.Question,
 			&item.Type,
-			&item.IsAnonymous,
-			&endsAt,
+			&item.ImageURL,
 			&item.CreatedAt,
 			&item.TotalVotes,
 		); scanErr != nil {
 			return nil, scanErr
 		}
-		item.EndsAt = endsAt
 		items = append(items, item)
 	}
 
@@ -178,7 +169,7 @@ func (r *PollRepository) List(ctx context.Context, filter repository.PollListFil
 }
 
 func (r *PollRepository) UpdateByIDAndCreator(ctx context.Context, pollID, creatorID string, patch repository.PollPatch) error {
-	sets := make([]string, 0, 3)
+	sets := make([]string, 0, 4)
 	args := make([]any, 0, 5)
 	argPos := 1
 
@@ -187,14 +178,9 @@ func (r *PollRepository) UpdateByIDAndCreator(ctx context.Context, pollID, creat
 		args = append(args, *patch.Question)
 		argPos++
 	}
-	if patch.IsAnonymous != nil {
-		sets = append(sets, fmt.Sprintf("is_anonymous = $%d", argPos))
-		args = append(args, *patch.IsAnonymous)
-		argPos++
-	}
-	if patch.EndsAt != nil {
-		sets = append(sets, fmt.Sprintf("ends_at = $%d", argPos))
-		args = append(args, *patch.EndsAt)
+	if patch.ImageURL != nil {
+		sets = append(sets, fmt.Sprintf("image_url = $%d", argPos))
+		args = append(args, *patch.ImageURL)
 		argPos++
 	}
 

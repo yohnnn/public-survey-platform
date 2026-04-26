@@ -35,8 +35,6 @@ var (
 	_ = metadata.Join
 )
 
-var filter_AnalyticsService_GetPollAnalytics_0 = &utilities.DoubleArray{Encoding: map[string]int{"poll_id": 0}, Base: []int{1, 1, 0}, Check: []int{0, 1, 2}}
-
 func request_AnalyticsService_GetPollAnalytics_0(ctx context.Context, marshaler runtime.Marshaler, client AnalyticsServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
 		protoReq GetPollAnalyticsRequest
@@ -53,12 +51,6 @@ func request_AnalyticsService_GetPollAnalytics_0(ctx context.Context, marshaler 
 	protoReq.PollId, err = runtime.String(val)
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "poll_id", err)
-	}
-	if err := req.ParseForm(); err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
-	}
-	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_AnalyticsService_GetPollAnalytics_0); err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 	msg, err := client.GetPollAnalytics(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
@@ -78,17 +70,9 @@ func local_request_AnalyticsService_GetPollAnalytics_0(ctx context.Context, mars
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "poll_id", err)
 	}
-	if err := req.ParseForm(); err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
-	}
-	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_AnalyticsService_GetPollAnalytics_0); err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
-	}
 	msg, err := server.GetPollAnalytics(ctx, &protoReq)
 	return msg, metadata, err
 }
-
-var filter_AnalyticsService_GetCountryStats_0 = &utilities.DoubleArray{Encoding: map[string]int{"poll_id": 0}, Base: []int{1, 1, 0}, Check: []int{0, 1, 2}}
 
 func request_AnalyticsService_GetCountryStats_0(ctx context.Context, marshaler runtime.Marshaler, client AnalyticsServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
@@ -106,12 +90,6 @@ func request_AnalyticsService_GetCountryStats_0(ctx context.Context, marshaler r
 	protoReq.PollId, err = runtime.String(val)
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "poll_id", err)
-	}
-	if err := req.ParseForm(); err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
-	}
-	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_AnalyticsService_GetCountryStats_0); err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 	msg, err := client.GetCountryStats(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
@@ -131,17 +109,9 @@ func local_request_AnalyticsService_GetCountryStats_0(ctx context.Context, marsh
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "poll_id", err)
 	}
-	if err := req.ParseForm(); err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
-	}
-	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_AnalyticsService_GetCountryStats_0); err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
-	}
 	msg, err := server.GetCountryStats(ctx, &protoReq)
 	return msg, metadata, err
 }
-
-var filter_AnalyticsService_GetGenderStats_0 = &utilities.DoubleArray{Encoding: map[string]int{"poll_id": 0}, Base: []int{1, 1, 0}, Check: []int{0, 1, 2}}
 
 func request_AnalyticsService_GetGenderStats_0(ctx context.Context, marshaler runtime.Marshaler, client AnalyticsServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
@@ -159,12 +129,6 @@ func request_AnalyticsService_GetGenderStats_0(ctx context.Context, marshaler ru
 	protoReq.PollId, err = runtime.String(val)
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "poll_id", err)
-	}
-	if err := req.ParseForm(); err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
-	}
-	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_AnalyticsService_GetGenderStats_0); err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 	msg, err := client.GetGenderStats(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
@@ -184,17 +148,9 @@ func local_request_AnalyticsService_GetGenderStats_0(ctx context.Context, marsha
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "poll_id", err)
 	}
-	if err := req.ParseForm(); err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
-	}
-	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_AnalyticsService_GetGenderStats_0); err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
-	}
 	msg, err := server.GetGenderStats(ctx, &protoReq)
 	return msg, metadata, err
 }
-
-var filter_AnalyticsService_GetAgeStats_0 = &utilities.DoubleArray{Encoding: map[string]int{"poll_id": 0}, Base: []int{1, 1, 0}, Check: []int{0, 1, 2}}
 
 func request_AnalyticsService_GetAgeStats_0(ctx context.Context, marshaler runtime.Marshaler, client AnalyticsServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
@@ -213,12 +169,6 @@ func request_AnalyticsService_GetAgeStats_0(ctx context.Context, marshaler runti
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "poll_id", err)
 	}
-	if err := req.ParseForm(); err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
-	}
-	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_AnalyticsService_GetAgeStats_0); err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
-	}
 	msg, err := client.GetAgeStats(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
 }
@@ -236,12 +186,6 @@ func local_request_AnalyticsService_GetAgeStats_0(ctx context.Context, marshaler
 	protoReq.PollId, err = runtime.String(val)
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "poll_id", err)
-	}
-	if err := req.ParseForm(); err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
-	}
-	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_AnalyticsService_GetAgeStats_0); err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 	msg, err := server.GetAgeStats(ctx, &protoReq)
 	return msg, metadata, err

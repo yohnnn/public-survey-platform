@@ -71,3 +71,20 @@ func (h *Handler) GetMyPolls(ctx context.Context, req *feedv1.GetMyPollsRequest)
 		Page:  mapCursorPageMeta(nextCursor, hasMore, req.GetLimit()),
 	}, nil
 }
+
+func (h *Handler) GetFollowingFeed(ctx context.Context, req *feedv1.GetFollowingFeedRequest) (*feedv1.GetFeedResponse, error) {
+	userID, ok := grpcinterceptor.UserIDFromContext(ctx)
+	if !ok || strings.TrimSpace(userID) == "" {
+		return nil, toStatusError(models.ErrUnauthorized)
+	}
+
+	items, nextCursor, hasMore, err := h.svc.GetFollowingFeed(ctx, userID, req.GetCursor(), req.GetLimit())
+	if err != nil {
+		return nil, toStatusError(err)
+	}
+
+	return &feedv1.GetFeedResponse{
+		Items: mapFeedItems(items),
+		Page:  mapCursorPageMeta(nextCursor, hasMore, req.GetLimit()),
+	}, nil
+}

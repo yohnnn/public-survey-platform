@@ -38,8 +38,8 @@ func NewAnalyticsService(next service.AnalyticsService, store cachepkg.Store, cf
 	return &analyticsService{next: next, store: store, ttl: ttl}
 }
 
-func (s *analyticsService) GetPollAnalytics(ctx context.Context, pollID string, from, to *time.Time, interval string) (models.PollAnalytics, error) {
-	key := cacheKey("poll", pollID, from, to, interval)
+func (s *analyticsService) GetPollAnalytics(ctx context.Context, pollID string) (models.PollAnalytics, error) {
+	key := cacheKey("poll", pollID)
 	var cached models.PollAnalytics
 
 	found, err := cachepkg.GetJSON(ctx, s.store, key, &cached)
@@ -47,7 +47,7 @@ func (s *analyticsService) GetPollAnalytics(ctx context.Context, pollID string, 
 		return cached, nil
 	}
 
-	result, err := s.next.GetPollAnalytics(ctx, pollID, from, to, interval)
+	result, err := s.next.GetPollAnalytics(ctx, pollID)
 	if err != nil {
 		return result, err
 	}
@@ -58,8 +58,8 @@ func (s *analyticsService) GetPollAnalytics(ctx context.Context, pollID string, 
 	return result, nil
 }
 
-func (s *analyticsService) GetCountryStats(ctx context.Context, pollID string, from, to *time.Time, interval string) ([]models.CountryStat, error) {
-	key := cacheKey("country", pollID, from, to, interval)
+func (s *analyticsService) GetCountryStats(ctx context.Context, pollID string) ([]models.CountryStat, error) {
+	key := cacheKey("country", pollID)
 	var cached []models.CountryStat
 
 	found, err := cachepkg.GetJSON(ctx, s.store, key, &cached)
@@ -67,7 +67,7 @@ func (s *analyticsService) GetCountryStats(ctx context.Context, pollID string, f
 		return cached, nil
 	}
 
-	result, err := s.next.GetCountryStats(ctx, pollID, from, to, interval)
+	result, err := s.next.GetCountryStats(ctx, pollID)
 	if err != nil {
 		return result, err
 	}
@@ -78,8 +78,8 @@ func (s *analyticsService) GetCountryStats(ctx context.Context, pollID string, f
 	return result, nil
 }
 
-func (s *analyticsService) GetGenderStats(ctx context.Context, pollID string, from, to *time.Time, interval string) ([]models.GenderStat, error) {
-	key := cacheKey("gender", pollID, from, to, interval)
+func (s *analyticsService) GetGenderStats(ctx context.Context, pollID string) ([]models.GenderStat, error) {
+	key := cacheKey("gender", pollID)
 	var cached []models.GenderStat
 
 	found, err := cachepkg.GetJSON(ctx, s.store, key, &cached)
@@ -87,7 +87,7 @@ func (s *analyticsService) GetGenderStats(ctx context.Context, pollID string, fr
 		return cached, nil
 	}
 
-	result, err := s.next.GetGenderStats(ctx, pollID, from, to, interval)
+	result, err := s.next.GetGenderStats(ctx, pollID)
 	if err != nil {
 		return result, err
 	}
@@ -98,8 +98,8 @@ func (s *analyticsService) GetGenderStats(ctx context.Context, pollID string, fr
 	return result, nil
 }
 
-func (s *analyticsService) GetAgeStats(ctx context.Context, pollID string, from, to *time.Time, interval string) ([]models.AgeStat, error) {
-	key := cacheKey("age", pollID, from, to, interval)
+func (s *analyticsService) GetAgeStats(ctx context.Context, pollID string) ([]models.AgeStat, error) {
+	key := cacheKey("age", pollID)
 	var cached []models.AgeStat
 
 	found, err := cachepkg.GetJSON(ctx, s.store, key, &cached)
@@ -107,7 +107,7 @@ func (s *analyticsService) GetAgeStats(ctx context.Context, pollID string, from,
 		return cached, nil
 	}
 
-	result, err := s.next.GetAgeStats(ctx, pollID, from, to, interval)
+	result, err := s.next.GetAgeStats(ctx, pollID)
 	if err != nil {
 		return result, err
 	}
@@ -126,17 +126,10 @@ func shouldCachePollAnalytics(result models.PollAnalytics) bool {
 	return len(result.Options) > 0 || len(result.Countries) > 0 || len(result.Gender) > 0 || len(result.Age) > 0
 }
 
-func cacheKey(kind, pollID string, from, to *time.Time, interval string) string {
+func cacheKey(kind, pollID string) string {
 	return fmt.Sprintf(
 		"analytics-service:%s:%s",
 		kind,
-		cachepkg.HashParts(strings.TrimSpace(pollID), formatTime(from), formatTime(to), strings.TrimSpace(interval)),
+		cachepkg.HashParts(strings.TrimSpace(pollID)),
 	)
-}
-
-func formatTime(v *time.Time) string {
-	if v == nil {
-		return ""
-	}
-	return v.UTC().Format(time.RFC3339Nano)
 }

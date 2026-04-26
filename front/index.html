@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Public Survey</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="site-header">
+        <a class="brand" href="#/">
+          <span class="brand-mark">PS</span>
+          <span>
+            <strong>Public Survey</strong>
+            <small>опросы для всех</small>
+          </span>
+        </a>
+
+        <button id="mobile-menu-button" class="mobile-menu-button" type="button" aria-label="Открыть меню">
+          Меню
+        </button>
+
+        <nav id="main-nav" class="main-nav"></nav>
+
+        <div id="session-actions" class="session-actions"></div>
+      </header>
+
+      <main id="app" class="app" tabindex="-1"></main>
+    </div>
+
+    <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

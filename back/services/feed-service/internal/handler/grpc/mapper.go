@@ -11,10 +11,12 @@ func mapFeedItem(model models.FeedItem) *feedv1.FeedItem {
 	return &feedv1.FeedItem{
 		Id:         model.ID,
 		Question:   model.Question,
+		ImageUrl:   model.ImageURL,
 		TotalVotes: model.TotalVotes,
 		Options:    mapFeedOptions(model.Options),
 		Tags:       model.Tags,
 		CreatedAt:  timestamppb.New(model.CreatedAt),
+		Author:     mapFeedAuthor(model.Author),
 	}
 }
 
@@ -36,6 +38,13 @@ func mapFeedOptions(items []models.FeedItemOption) []*feedv1.FeedOption {
 		})
 	}
 	return out
+}
+
+func mapFeedAuthor(author models.FeedAuthor) *feedv1.FeedAuthor {
+	return &feedv1.FeedAuthor{
+		Id:       author.ID,
+		Nickname: author.Nickname,
+	}
 }
 
 func mapCursorPageMeta(nextCursor string, hasMore bool, limit uint32) *commonv1.CursorPageMeta {

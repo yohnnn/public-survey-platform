@@ -51,8 +51,8 @@ func NewPollService(next service.PollService, store cachepkg.Store, cfg Config) 
 	return &pollService{next: next, store: store, cfg: cfg}
 }
 
-func (s *pollService) CreatePoll(ctx context.Context, userID, question string, pollType models.PollType, isAnonymous bool, endsAt *time.Time, options, tags []string) (models.Poll, error) {
-	poll, err := s.next.CreatePoll(ctx, userID, question, pollType, isAnonymous, endsAt, options, tags)
+func (s *pollService) CreatePoll(ctx context.Context, userID, question string, pollType models.PollType, options, tags []string, imageURL string) (models.Poll, error) {
+	poll, err := s.next.CreatePoll(ctx, userID, question, pollType, options, tags, imageURL)
 	if err != nil {
 		return poll, err
 	}
@@ -109,8 +109,8 @@ func (s *pollService) ListPolls(ctx context.Context, cursor string, limit uint32
 	return s.next.ListPolls(ctx, cursor, limit, tags)
 }
 
-func (s *pollService) UpdatePoll(ctx context.Context, userID, id string, question *string, isAnonymous *bool, endsAt *time.Time, tags []string, tagsProvided bool) (models.Poll, error) {
-	poll, err := s.next.UpdatePoll(ctx, userID, id, question, isAnonymous, endsAt, tags, tagsProvided)
+func (s *pollService) UpdatePoll(ctx context.Context, userID, id string, question *string, tags []string, tagsProvided bool, imageURL *string) (models.Poll, error) {
+	poll, err := s.next.UpdatePoll(ctx, userID, id, question, tags, tagsProvided, imageURL)
 	if err != nil {
 		return poll, err
 	}
@@ -169,6 +169,10 @@ func (s *pollService) ListTags(ctx context.Context) ([]models.Tag, error) {
 	}
 
 	return s.next.ListTags(ctx)
+}
+
+func (s *pollService) CreatePollImageUploadURL(ctx context.Context, userID, fileName, contentType string, sizeBytes int64) (models.PollImageUpload, error) {
+	return s.next.CreatePollImageUploadURL(ctx, userID, fileName, contentType, sizeBytes)
 }
 
 type pollListCacheValue struct {

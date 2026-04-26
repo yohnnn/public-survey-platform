@@ -16,9 +16,8 @@ type PollListFilter struct {
 }
 
 type PollPatch struct {
-	Question    *string
-	IsAnonymous *bool
-	EndsAt      *time.Time
+	Question *string
+	ImageURL *string
 }
 
 type PollRepository interface {

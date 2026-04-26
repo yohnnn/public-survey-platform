@@ -4,7 +4,6 @@ package poll.v1;
 
 import "google/api/annotations.proto";
 import "google/protobuf/timestamp.proto";
-
 option go_package = "github.com/yohnnn/public-survey-platform/back/api/gen/go/poll/v1;pollv1";
 
 enum PollType {
@@ -24,12 +23,11 @@ message Poll {
   string creator_id = 2;
   string question = 3;
   PollType type = 4;
-  bool is_anonymous = 5;
-  google.protobuf.Timestamp ends_at = 6;
-  google.protobuf.Timestamp created_at = 7;
-  int64 total_votes = 8;
-  repeated PollOption options = 9;
-  repeated string tags = 10;
+  google.protobuf.Timestamp created_at = 5;
+  int64 total_votes = 6;
+  repeated PollOption options = 7;
+  repeated string tags = 8;
+  string image_url = 9;
 }
 
 service PollService {
@@ -77,15 +75,21 @@ service PollService {
       get: "/v1/tags"
     };
   }
+
+  rpc CreatePollImageUploadURL(CreatePollImageUploadURLRequest) returns (CreatePollImageUploadURLResponse) {
+    option (google.api.http) = {
+      post: "/v1/polls/images:upload-url"
+      body: "*"
+    };
+  }
 }
 
 message CreatePollRequest {
   string question = 1;
   PollType type = 2;
-  bool is_anonymous = 3;
-  google.protobuf.Timestamp ends_at = 4;
-  repeated string options = 5;
-  repeated string tags = 6;
+  repeated string options = 3;
+  repeated string tags = 4;
+  string image_url = 5;
 }
 
 message GetPollRequest {
@@ -119,9 +123,21 @@ message UpdatePollResponse {
 message UpdatePollRequest {
   string id = 1;
   string question = 2;
-  optional bool is_anonymous = 3;
-  google.protobuf.Timestamp ends_at = 4;
-  repeated string tags = 5;
+  repeated string tags = 3;
+  optional string image_url = 4;
+}
+
+message CreatePollImageUploadURLRequest {
+  string filename = 1;
+  string content_type = 2;
+  int64 size_bytes = 3;
+}
+
+message CreatePollImageUploadURLResponse {
+  string object_key = 1;
+  string upload_url = 2;
+  string image_url = 3;
+  int64 expires_in_seconds = 4;
 }
 
 message DeletePollRequest {

@@ -11,7 +11,7 @@ import (
 type Config struct {
 	GRPCAddr          string
 	DatabaseURL       string
-	AuthGRPCEndpoint  string
+	UserGRPCEndpoint  string
 	RedisAddr         string
 	RedisPassword     string
 	RedisDB           int
@@ -26,7 +26,7 @@ func Load() (Config, error) {
 	cfg := Config{
 		GRPCAddr:          getEnv("GRPC_ADDR", ":50054"),
 		DatabaseURL:       strings.TrimSpace(getEnv("DATABASE_URL", "")),
-		AuthGRPCEndpoint:  strings.TrimSpace(getEnv("AUTH_GRPC_ENDPOINT", "auth-service:50051")),
+		UserGRPCEndpoint:  strings.TrimSpace(getEnv("USER_GRPC_ENDPOINT", "user-service:50051")),
 		RedisAddr:         strings.TrimSpace(getEnv("REDIS_ADDR", "")),
 		RedisPassword:     getEnv("REDIS_PASSWORD", ""),
 		RedisDB:           getEnvInt("REDIS_DB", 0),

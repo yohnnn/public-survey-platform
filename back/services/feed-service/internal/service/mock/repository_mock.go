@@ -42,6 +42,48 @@ func (m *MockFeedRepository) EXPECT() *MockFeedRepositoryMockRecorder {
 	return m.recorder
 }
 
+// AddPendingOptionVotes mocks base method.
+func (m *MockFeedRepository) AddPendingOptionVotes(ctx context.Context, pollID, optionID string, delta int64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddPendingOptionVotes", ctx, pollID, optionID, delta)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// AddPendingOptionVotes indicates an expected call of AddPendingOptionVotes.
+func (mr *MockFeedRepositoryMockRecorder) AddPendingOptionVotes(ctx, pollID, optionID, delta any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddPendingOptionVotes", reflect.TypeOf((*MockFeedRepository)(nil).AddPendingOptionVotes), ctx, pollID, optionID, delta)
+}
+
+// AddPendingTotalVotes mocks base method.
+func (m *MockFeedRepository) AddPendingTotalVotes(ctx context.Context, pollID string, delta int64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddPendingTotalVotes", ctx, pollID, delta)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// AddPendingTotalVotes indicates an expected call of AddPendingTotalVotes.
+func (mr *MockFeedRepositoryMockRecorder) AddPendingTotalVotes(ctx, pollID, delta any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddPendingTotalVotes", reflect.TypeOf((*MockFeedRepository)(nil).AddPendingTotalVotes), ctx, pollID, delta)
+}
+
+// ApplyPendingVotes mocks base method.
+func (m *MockFeedRepository) ApplyPendingVotes(ctx context.Context, feedItemID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ApplyPendingVotes", ctx, feedItemID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ApplyPendingVotes indicates an expected call of ApplyPendingVotes.
+func (mr *MockFeedRepositoryMockRecorder) ApplyPendingVotes(ctx, feedItemID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplyPendingVotes", reflect.TypeOf((*MockFeedRepository)(nil).ApplyPendingVotes), ctx, feedItemID)
+}
+
 // CreateFeedItem mocks base method.
 func (m *MockFeedRepository) CreateFeedItem(ctx context.Context, item models.FeedItem, options []models.FeedItemOption, tags []string) error {
 	m.ctrl.T.Helper()
@@ -83,6 +125,21 @@ func (m *MockFeedRepository) GetFeed(ctx context.Context, filter repository.Feed
 func (mr *MockFeedRepositoryMockRecorder) GetFeed(ctx, filter any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFeed", reflect.TypeOf((*MockFeedRepository)(nil).GetFeed), ctx, filter)
+}
+
+// GetFollowingFeed mocks base method.
+func (m *MockFeedRepository) GetFollowingFeed(ctx context.Context, filter repository.FeedListFilter) ([]models.FeedItem, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetFollowingFeed", ctx, filter)
+	ret0, _ := ret[0].([]models.FeedItem)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetFollowingFeed indicates an expected call of GetFollowingFeed.
+func (mr *MockFeedRepositoryMockRecorder) GetFollowingFeed(ctx, filter any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFollowingFeed", reflect.TypeOf((*MockFeedRepository)(nil).GetFollowingFeed), ctx, filter)
 }
 
 // GetOptionsByFeedItemIDs mocks base method.
@@ -146,11 +203,12 @@ func (mr *MockFeedRepositoryMockRecorder) GetUserPolls(ctx, filter any) *gomock.
 }
 
 // IncrementOptionVotes mocks base method.
-func (m *MockFeedRepository) IncrementOptionVotes(ctx context.Context, optionID string, delta int64) error {
+func (m *MockFeedRepository) IncrementOptionVotes(ctx context.Context, optionID string, delta int64) (bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "IncrementOptionVotes", ctx, optionID, delta)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // IncrementOptionVotes indicates an expected call of IncrementOptionVotes.
@@ -189,11 +247,12 @@ func (mr *MockFeedRepositoryMockRecorder) UpdateFeedItem(ctx, item, tags any) *g
 }
 
 // UpdateTotalVotes mocks base method.
-func (m *MockFeedRepository) UpdateTotalVotes(ctx context.Context, feedItemID string, delta int64) error {
+func (m *MockFeedRepository) UpdateTotalVotes(ctx context.Context, feedItemID string, delta int64) (bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateTotalVotes", ctx, feedItemID, delta)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // UpdateTotalVotes indicates an expected call of UpdateTotalVotes.

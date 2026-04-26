@@ -35,12 +35,23 @@ service FeedService {
       get: "/v1/feed/me"
     };
   }
+
+  rpc GetFollowingFeed(GetFollowingFeedRequest) returns (GetFeedResponse) {
+    option (google.api.http) = {
+      get: "/v1/feed/following"
+    };
+  }
 }
 
 message FeedOption {
   string id = 1;
   string text = 2;
   int64 votes_count = 3;
+}
+
+message FeedAuthor {
+  string id = 1;
+  string nickname = 2;
 }
 
 message FeedItem {
@@ -50,6 +61,8 @@ message FeedItem {
   repeated FeedOption options = 4;
   repeated string tags = 5;
   google.protobuf.Timestamp created_at = 6;
+  string image_url = 7;
+  FeedAuthor author = 8;
 }
 
 message GetFeedRequest {
@@ -71,6 +84,11 @@ message GetUserPollsRequest {
 }
 
 message GetMyPollsRequest {
+  string cursor = 1;
+  uint32 limit = 2;
+}
+
+message GetFollowingFeedRequest {
   string cursor = 1;
   uint32 limit = 2;
 }

@@ -7,6 +7,7 @@ type pollCreatedPayload struct {
 	PollID    string              `json:"poll_id"`
 	CreatorID string              `json:"creator_id"`
 	Question  string              `json:"question"`
+	ImageURL  string              `json:"image_url,omitempty"`
 	Options   []pollCreatedOption `json:"options"`
 	Tags      []string            `json:"tags"`
 	CreatedAt time.Time           `json:"created_at"`
@@ -16,6 +17,7 @@ type pollUpdatedPayload struct {
 	EventID   string    `json:"event_id"`
 	PollID    string    `json:"poll_id"`
 	Question  string    `json:"question"`
+	ImageURL  string    `json:"image_url,omitempty"`
 	Tags      []string  `json:"tags"`
 	UpdatedAt time.Time `json:"updated_at"`
 }

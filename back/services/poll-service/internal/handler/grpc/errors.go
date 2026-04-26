@@ -13,6 +13,10 @@ var grpcErrorRules = []apperrors.GRPCRule{
 	{Target: models.ErrPollNotFound, Code: codes.NotFound},
 	{Target: models.ErrTagNotFound, Code: codes.NotFound},
 	{Target: models.ErrTagAlreadyExist, Code: codes.AlreadyExists},
+	{Target: models.ErrInvalidImageURL, Code: codes.InvalidArgument},
+	{Target: models.ErrImageTooLarge, Code: codes.InvalidArgument},
+	{Target: models.ErrUnsupportedMime, Code: codes.InvalidArgument},
+	{Target: models.ErrImageUploadOff, Code: codes.FailedPrecondition},
 }
 
 func toStatusError(err error) error {

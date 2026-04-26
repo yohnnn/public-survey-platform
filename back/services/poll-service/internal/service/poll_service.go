@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -22,6 +23,7 @@ type pollService struct {
 	tx     tx.Manager
 	clock  Clock
 	ids    IDGenerator
+	images PollImageUploader
 }
 
 func NewPollService(
@@ -31,6 +33,7 @@ func NewPollService(
 	tx tx.Manager,
 	clock Clock,
 	ids IDGenerator,
+	images PollImageUploader,
 ) PollService {
 	return &pollService{
 		polls:  polls,
@@ -39,10 +42,11 @@ func NewPollService(
 		tx:     tx,
 		clock:  clock,
 		ids:    ids,
+		images: images,
 	}
 }
 
-func (s *pollService) CreatePoll(ctx context.Context, userID, question string, pollType models.PollType, isAnonymous bool, endsAt *time.Time, options, tags []string) (models.Poll, error) {
+func (s *pollService) CreatePoll(ctx context.Context, userID, question string, pollType models.PollType, options, tags []string, imageURL string) (models.Poll, error) {
 	if strings.TrimSpace(userID) == "" {
 		return models.Poll{}, models.ErrUnauthorized
 	}
@@ -60,15 +64,19 @@ func (s *pollService) CreatePoll(ctx context.Context, userID, question string, p
 		return models.Poll{}, models.ErrInvalidArgument
 	}
 
+	normalizedImageURL, err := normalizeImageURL(imageURL)
+	if err != nil {
+		return models.Poll{}, err
+	}
+
 	now := s.clock.Now().UTC()
 	poll := models.Poll{
-		ID:          s.ids.NewID(),
-		CreatorID:   userID,
-		Question:    question,
-		Type:        pollType,
-		IsAnonymous: isAnonymous,
-		EndsAt:      normalizeEndsAt(endsAt),
-		CreatedAt:   now,
+		ID:        s.ids.NewID(),
+		CreatorID: userID,
+		Question:  question,
+		Type:      pollType,
+		ImageURL:  normalizedImageURL,
+		CreatedAt: now,
 	}
 
 	pollOptions := make([]models.PollOption, 0, len(normalizedOptions))
@@ -81,7 +89,7 @@ func (s *pollService) CreatePoll(ctx context.Context, userID, question string, p
 	}
 
 	normalizedTags := normalizeTags(tags)
-	err := s.tx.WithTx(ctx, func(txCtx context.Context) error {
+	err = s.tx.WithTx(ctx, func(txCtx context.Context) error {
 		eventID := s.ids.NewID()
 
 		ensuredTags, ensureErr := s.tags.EnsureByNames(txCtx, normalizedTags)
@@ -214,7 +222,7 @@ func (s *pollService) ListPolls(ctx context.Context, cursor string, limit uint32
 	return items, nextCursor, hasMore, nil
 }
 
-func (s *pollService) UpdatePoll(ctx context.Context, userID, id string, question *string, isAnonymous *bool, endsAt *time.Time, tags []string, tagsProvided bool) (models.Poll, error) {
+func (s *pollService) UpdatePoll(ctx context.Context, userID, id string, question *string, tags []string, tagsProvided bool, imageURL *string) (models.Poll, error) {
 	if strings.TrimSpace(userID) == "" {
 		return models.Poll{}, models.ErrUnauthorized
 	}
@@ -231,15 +239,15 @@ func (s *pollService) UpdatePoll(ctx context.Context, userID, id string, questio
 		}
 		patch.Question = &q
 	}
-	if isAnonymous != nil {
-		patch.IsAnonymous = isAnonymous
-	}
-	if endsAt != nil {
-		normalized := endsAt.UTC()
-		patch.EndsAt = &normalized
+	if imageURL != nil {
+		normalizedImageURL, err := normalizeImageURL(*imageURL)
+		if err != nil {
+			return models.Poll{}, err
+		}
+		patch.ImageURL = &normalizedImageURL
 	}
 
-	if patch.Question == nil && patch.IsAnonymous == nil && patch.EndsAt == nil && !tagsProvided {
+	if patch.Question == nil && patch.ImageURL == nil && !tagsProvided {
 		return models.Poll{}, models.ErrInvalidArgument
 	}
 
@@ -358,6 +366,29 @@ func (s *pollService) ListTags(ctx context.Context) ([]models.Tag, error) {
 	return s.tags.List(ctx)
 }
 
+func (s *pollService) CreatePollImageUploadURL(ctx context.Context, userID, fileName, contentType string, sizeBytes int64) (models.PollImageUpload, error) {
+	if strings.TrimSpace(userID) == "" {
+		return models.PollImageUpload{}, models.ErrUnauthorized
+	}
+	if s.images == nil {
+		return models.PollImageUpload{}, models.ErrImageUploadOff
+	}
+
+	upload, err := s.images.CreatePollImageUploadURL(ctx, userID, fileName, contentType, sizeBytes)
+	if err != nil {
+		return models.PollImageUpload{}, err
+	}
+
+	upload.ObjectKey = strings.TrimSpace(upload.ObjectKey)
+	upload.UploadURL = strings.TrimSpace(upload.UploadURL)
+	upload.ImageURL = strings.TrimSpace(upload.ImageURL)
+	if upload.ObjectKey == "" || upload.UploadURL == "" || upload.ImageURL == "" || upload.ExpiresInSeconds <= 0 {
+		return models.PollImageUpload{}, models.ErrInvalidArgument
+	}
+
+	return upload, nil
+}
+
 func normalizeOptions(options []string) []string {
 	result := make([]string, 0, len(options))
 	seen := make(map[string]struct{}, len(options))
@@ -394,34 +425,51 @@ func normalizeTags(tags []string) []string {
 	return result
 }
 
-func normalizeEndsAt(endsAt *time.Time) *time.Time {
-	if endsAt == nil {
-		return nil
+func normalizeImageURL(raw string) (string, error) {
+	v := strings.TrimSpace(raw)
+	if v == "" {
+		return "", nil
 	}
-	v := endsAt.UTC()
-	return &v
+
+	if len(v) > 2048 {
+		return "", models.ErrInvalidImageURL
+	}
+
+	parsed, err := url.Parse(v)
+	if err != nil {
+		return "", models.ErrInvalidImageURL
+	}
+
+	scheme := strings.ToLower(strings.TrimSpace(parsed.Scheme))
+	if scheme != "http" && scheme != "https" {
+		return "", models.ErrInvalidImageURL
+	}
+	if strings.TrimSpace(parsed.Host) == "" {
+		return "", models.ErrInvalidImageURL
+	}
+
+	return v, nil
 }
 
 type pollCreatedPayload struct {
-	EventID     string       `json:"event_id"`
-	PollID      string       `json:"poll_id"`
-	CreatorID   string       `json:"creator_id"`
-	Question    string       `json:"question"`
-	Type        int32        `json:"type"`
-	IsAnonymous bool         `json:"is_anonymous"`
-	EndsAt      *time.Time   `json:"ends_at,omitempty"`
-	CreatedAt   time.Time    `json:"created_at"`
-	Options     []pollOption `json:"options"`
-	Tags        []string     `json:"tags"`
+	EventID   string       `json:"event_id"`
+	PollID    string       `json:"poll_id"`
+	CreatorID string       `json:"creator_id"`
+	Question  string       `json:"question"`
+	ImageURL  string       `json:"image_url,omitempty"`
+	Type      int32        `json:"type"`
+	CreatedAt time.Time    `json:"created_at"`
+	Options   []pollOption `json:"options"`
+	Tags      []string     `json:"tags"`
 }
 
 type pollUpdatedPayload struct {
-	EventID   string     `json:"event_id"`
-	PollID    string     `json:"poll_id"`
-	Question  string     `json:"question"`
-	Tags      []string   `json:"tags"`
-	UpdatedAt time.Time  `json:"updated_at"`
-	EndsAt    *time.Time `json:"ends_at,omitempty"`
+	EventID   string    `json:"event_id"`
+	PollID    string    `json:"poll_id"`
+	Question  string    `json:"question"`
+	ImageURL  string    `json:"image_url,omitempty"`
+	Tags      []string  `json:"tags"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type pollDeletedPayload struct {
@@ -447,16 +495,15 @@ func marshalPollCreatedPayload(eventID string, poll models.Poll, options []model
 	}
 
 	payload, err := json.Marshal(pollCreatedPayload{
-		EventID:     eventID,
-		PollID:      poll.ID,
-		CreatorID:   poll.CreatorID,
-		Question:    poll.Question,
-		Type:        int32(poll.Type),
-		IsAnonymous: poll.IsAnonymous,
-		EndsAt:      poll.EndsAt,
-		CreatedAt:   poll.CreatedAt,
-		Options:     payloadOptions,
-		Tags:        tags,
+		EventID:   eventID,
+		PollID:    poll.ID,
+		CreatorID: poll.CreatorID,
+		Question:  poll.Question,
+		ImageURL:  poll.ImageURL,
+		Type:      int32(poll.Type),
+		CreatedAt: poll.CreatedAt,
+		Options:   payloadOptions,
+		Tags:      tags,
 	})
 	if err != nil {
 		return nil, err
@@ -470,9 +517,9 @@ func marshalPollUpdatedPayload(eventID string, poll models.Poll, updatedAt time.
 		EventID:   eventID,
 		PollID:    poll.ID,
 		Question:  poll.Question,
+		ImageURL:  poll.ImageURL,
 		Tags:      poll.Tags,
 		UpdatedAt: updatedAt,
-		EndsAt:    poll.EndsAt,
 	})
 	if err != nil {
 		return nil, err

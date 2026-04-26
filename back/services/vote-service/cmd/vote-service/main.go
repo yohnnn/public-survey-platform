@@ -16,8 +16,8 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
-	authv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/auth/v1"
 	pollv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/poll/v1"
+	userv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/user/v1"
 	votev1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/vote/v1"
 	"github.com/yohnnn/public-survey-platform/back/pkg/events"
 	"github.com/yohnnn/public-survey-platform/back/pkg/grpcinterceptor"
@@ -48,12 +48,12 @@ func main() {
 	}
 	defer pool.Close()
 
-	authConn, err := grpc.NewClient(cfg.AuthGRPCEndpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	authConn, err := grpc.NewClient(cfg.UserGRPCEndpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		logger.Fatalf("connect to auth service: %v", err)
+		logger.Fatalf("connect to user service: %v", err)
 	}
 	defer authConn.Close()
-	authClient := authv1.NewAuthServiceClient(authConn)
+	authClient := userv1.NewUserServiceClient(authConn)
 
 	pollConn, err := grpc.NewClient(cfg.PollGRPCEndpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -96,7 +96,7 @@ func main() {
 
 	authInterceptor := grpcinterceptor.UnaryAuthInterceptor(
 		func(ctx context.Context, token string) (string, error) {
-			resp, err := authClient.ValidateToken(ctx, &authv1.ValidateTokenRequest{AccessToken: token})
+			resp, err := authClient.ValidateToken(ctx, &userv1.ValidateTokenRequest{AccessToken: token})
 			if err != nil {
 				return "", err
 			}

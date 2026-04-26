@@ -26,6 +26,20 @@ func UnaryAuthInterceptor(validate TokenValidator, publicMethods map[string]stru
 
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		if _, ok := publicMethods[info.FullMethod]; ok {
+			token, hasAuthorization := bearerTokenFromContext(ctx)
+			if !hasAuthorization {
+				return handler(ctx, req)
+			}
+			if token == "" {
+				return nil, status.Error(codes.Unauthenticated, "missing or invalid bearer token")
+			}
+
+			userID, err := validate(ctx, token)
+			if err != nil {
+				return nil, status.Error(codes.Unauthenticated, "invalid token")
+			}
+
+			ctx = context.WithValue(ctx, userIDCtxKey{}, userID)
 			return handler(ctx, req)
 		}
 
@@ -42,6 +56,20 @@ func UnaryAuthInterceptor(validate TokenValidator, publicMethods map[string]stru
 		ctx = context.WithValue(ctx, userIDCtxKey{}, userID)
 		return handler(ctx, req)
 	}
+}
+
+func bearerTokenFromContext(ctx context.Context) (string, bool) {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return "", false
+	}
+
+	values := md.Get("authorization")
+	if len(values) == 0 {
+		return "", false
+	}
+
+	return parseBearer(values[0]), true
 }
 
 func extractBearerToken(ctx context.Context) (string, error) {

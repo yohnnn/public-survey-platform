@@ -9,8 +9,6 @@ CREATE TABLE IF NOT EXISTS polls (
     creator_id TEXT NOT NULL,
     question TEXT NOT NULL,
     type SMALLINT NOT NULL CHECK (type IN (1, 2)),
-    is_anonymous BOOLEAN NOT NULL DEFAULT false,
-    ends_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     total_votes BIGINT NOT NULL DEFAULT 0
 );

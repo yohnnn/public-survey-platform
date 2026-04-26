@@ -2,7 +2,6 @@ package grpc
 
 import (
 	"context"
-	"time"
 
 	pollv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/poll/v1"
 	"github.com/yohnnn/public-survey-platform/back/pkg/grpcinterceptor"
@@ -25,20 +24,14 @@ func (h *Handler) CreatePoll(ctx context.Context, req *pollv1.CreatePollRequest)
 		return nil, toStatusError(models.ErrUnauthorized)
 	}
 
-	endsAt, err := timestampToTime(req.GetEndsAt())
-	if err != nil {
-		return nil, toStatusError(err)
-	}
-
 	poll, err := h.svc.CreatePoll(
 		ctx,
 		userID,
 		req.GetQuestion(),
 		models.PollType(req.GetType()),
-		req.GetIsAnonymous(),
-		endsAt,
 		req.GetOptions(),
 		req.GetTags(),
+		req.GetImageUrl(),
 	)
 	if err != nil {
 		return nil, toStatusError(err)
@@ -81,19 +74,10 @@ func (h *Handler) UpdatePoll(ctx context.Context, req *pollv1.UpdatePollRequest)
 		question = &q
 	}
 
-	var endsAt *time.Time
-	if req.EndsAt != nil {
-		et, err := timestampToTime(req.EndsAt)
-		if err != nil {
-			return nil, toStatusError(err)
-		}
-		endsAt = et
-	}
-
-	var isAnonymous *bool
-	if req.IsAnonymous != nil {
-		anon := req.GetIsAnonymous()
-		isAnonymous = &anon
+	var imageURL *string
+	if req.ImageUrl != nil {
+		imageValue := req.GetImageUrl()
+		imageURL = &imageValue
 	}
 
 	poll, err := h.svc.UpdatePoll(
@@ -101,10 +85,9 @@ func (h *Handler) UpdatePoll(ctx context.Context, req *pollv1.UpdatePollRequest)
 		userID,
 		req.GetId(),
 		question,
-		isAnonymous,
-		endsAt,
 		req.GetTags(),
 		req.Tags != nil,
+		imageURL,
 	)
 	if err != nil {
 		return nil, toStatusError(err)
@@ -147,4 +130,23 @@ func (h *Handler) ListTags(ctx context.Context, _ *pollv1.ListTagsRequest) (*pol
 	}
 
 	return &pollv1.ListTagsResponse{Items: mapTags(items)}, nil
+}
+
+func (h *Handler) CreatePollImageUploadURL(ctx context.Context, req *pollv1.CreatePollImageUploadURLRequest) (*pollv1.CreatePollImageUploadURLResponse, error) {
+	userID, ok := grpcinterceptor.UserIDFromContext(ctx)
+	if !ok || userID == "" {
+		return nil, toStatusError(models.ErrUnauthorized)
+	}
+
+	upload, err := h.svc.CreatePollImageUploadURL(ctx, userID, req.GetFilename(), req.GetContentType(), req.GetSizeBytes())
+	if err != nil {
+		return nil, toStatusError(err)
+	}
+
+	return &pollv1.CreatePollImageUploadURLResponse{
+		ObjectKey:        upload.ObjectKey,
+		UploadUrl:        upload.UploadURL,
+		ImageUrl:         upload.ImageURL,
+		ExpiresInSeconds: upload.ExpiresInSeconds,
+	}, nil
 }

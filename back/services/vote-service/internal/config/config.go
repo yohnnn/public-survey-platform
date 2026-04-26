@@ -11,7 +11,7 @@ import (
 type Config struct {
 	GRPCAddr          string
 	DatabaseURL       string
-	AuthGRPCEndpoint  string
+	UserGRPCEndpoint  string
 	PollGRPCEndpoint  string
 	OutboxInterval    time.Duration
 	OutboxBatchSize   int
@@ -25,7 +25,7 @@ func Load() (Config, error) {
 	cfg := Config{
 		GRPCAddr:          getEnv("GRPC_ADDR", ":50053"),
 		DatabaseURL:       strings.TrimSpace(getEnv("DATABASE_URL", "")),
-		AuthGRPCEndpoint:  strings.TrimSpace(getEnv("AUTH_GRPC_ENDPOINT", "")),
+		UserGRPCEndpoint:  strings.TrimSpace(getEnv("USER_GRPC_ENDPOINT", "")),
 		PollGRPCEndpoint:  strings.TrimSpace(getEnv("POLL_GRPC_ENDPOINT", "")),
 		OutboxInterval:    getEnvDuration("OUTBOX_RELAY_INTERVAL", time.Second),
 		OutboxBatchSize:   getEnvInt("OUTBOX_RELAY_BATCH_SIZE", 100),
@@ -38,8 +38,8 @@ func Load() (Config, error) {
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("DATABASE_URL is required")
 	}
-	if cfg.AuthGRPCEndpoint == "" {
-		return Config{}, fmt.Errorf("AUTH_GRPC_ENDPOINT is required")
+	if cfg.UserGRPCEndpoint == "" {
+		return Config{}, fmt.Errorf("USER_GRPC_ENDPOINT is required")
 	}
 	if cfg.PollGRPCEndpoint == "" {
 		return Config{}, fmt.Errorf("POLL_GRPC_ENDPOINT is required")

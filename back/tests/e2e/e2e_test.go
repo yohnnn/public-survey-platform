@@ -122,6 +122,78 @@ func (c *e2eClient) doJSON(method, baseURL, path, accessToken string, body any) 
 	return resp.StatusCode, obj, raw, nil
 }
 
+func (c *e2eClient) doPUT(target, hostHeader, contentType string, payload []byte) (int, []byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), c.cfg.RequestTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, target, bytes.NewReader(payload))
+	if err != nil {
+		return 0, nil, err
+	}
+	if hostHeader != "" {
+		req.Host = hostHeader
+	}
+	if strings.TrimSpace(contentType) != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
+
+	resp, err := c.streamClient.Do(req)
+	if err != nil {
+		return 0, nil, err
+	}
+	defer resp.Body.Close()
+
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return resp.StatusCode, nil, err
+	}
+
+	return resp.StatusCode, raw, nil
+}
+
+func (c *e2eClient) uploadPresigned(uploadURL, contentType string, payload []byte) error {
+	status, raw, err := c.doPUT(uploadURL, "", contentType, payload)
+	if err == nil && status >= http.StatusOK && status < http.StatusMultipleChoices {
+		return nil
+	}
+	primaryErr := formatUploadError(uploadURL, status, raw, err)
+
+	parsed, parseErr := url.Parse(uploadURL)
+	if parseErr != nil {
+		return primaryErr
+	}
+
+	host := strings.ToLower(strings.TrimSpace(parsed.Hostname()))
+	if host == "" || host == "localhost" || host == "127.0.0.1" {
+		return primaryErr
+	}
+
+	fallback := *parsed
+	port := strings.TrimSpace(parsed.Port())
+	if port == "" {
+		if strings.EqualFold(parsed.Scheme, "https") {
+			port = "443"
+		} else {
+			port = "9000"
+		}
+	}
+	fallback.Host = "localhost:" + port
+
+	statusFallback, rawFallback, errFallback := c.doPUT(fallback.String(), parsed.Host, contentType, payload)
+	if errFallback == nil && statusFallback >= http.StatusOK && statusFallback < http.StatusMultipleChoices {
+		return nil
+	}
+
+	return fmt.Errorf("%v; fallback=%v", primaryErr, formatUploadError(fallback.String(), statusFallback, rawFallback, errFallback))
+}
+
+func formatUploadError(target string, status int, raw []byte, err error) error {
+	if err != nil {
+		return fmt.Errorf("target=%s request error: %w", target, err)
+	}
+	return fmt.Errorf("target=%s status=%d body=%s", target, status, strings.TrimSpace(string(raw)))
+}
+
 func (c *e2eClient) mustJSON(t *testing.T, method, baseURL, path, accessToken string, body any, wantStatus int) map[string]any {
 	t.Helper()
 
@@ -184,6 +256,7 @@ func TestBackendE2EFullFlow(t *testing.T) {
 	registerBody1 := map[string]any{
 		"email":     user1Email,
 		"password":  password,
+		"nickname":  "userone" + suffix,
 		"country":   "RU",
 		"gender":    "male",
 		"birthYear": 1998,
@@ -191,6 +264,7 @@ func TestBackendE2EFullFlow(t *testing.T) {
 	registerBody2 := map[string]any{
 		"email":     user2Email,
 		"password":  password,
+		"nickname":  "usertwo" + suffix,
 		"country":   "DE",
 		"gender":    "female",
 		"birthYear": 2000,
@@ -203,16 +277,16 @@ func TestBackendE2EFullFlow(t *testing.T) {
 		t.Fatalf("register response must contain refreshToken")
 	}
 
-	meResp := client.mustJSON(t, http.MethodGet, cfg.APIBaseURL, "/v1/auth/me", accessToken1, nil, http.StatusOK)
+	meResp := client.mustJSON(t, http.MethodGet, cfg.APIBaseURL, "/v1/users/me", accessToken1, nil, http.StatusOK)
 	user1ID := mustStringPath(t, meResp, "user", "id")
 	if gotEmail := strings.ToLower(mustStringPath(t, meResp, "user", "email")); gotEmail != user1Email {
-		t.Fatalf("unexpected /v1/auth/me email=%s want=%s", gotEmail, user1Email)
+		t.Fatalf("unexpected /v1/users/me email=%s want=%s", gotEmail, user1Email)
 	}
 
 	updatedCountry := "US"
 	updatedGender := "other"
 	updatedBirthYear := int32(1997)
-	updateMeResp := client.mustJSON(t, http.MethodPatch, cfg.APIBaseURL, "/v1/auth/me", accessToken1, map[string]any{
+	updateMeResp := client.mustJSON(t, http.MethodPatch, cfg.APIBaseURL, "/v1/users/me", accessToken1, map[string]any{
 		"country":   updatedCountry,
 		"gender":    updatedGender,
 		"birthYear": updatedBirthYear,
@@ -242,6 +316,37 @@ func TestBackendE2EFullFlow(t *testing.T) {
 
 	registerResp2 := client.mustJSON(t, http.MethodPost, cfg.APIBaseURL, "/v1/auth/register", "", registerBody2, http.StatusOK)
 	accessToken2 := mustStringPath(t, registerResp2, "tokens", "accessToken")
+	meResp2 := client.mustJSON(t, http.MethodGet, cfg.APIBaseURL, "/v1/users/me", accessToken2, nil, http.StatusOK)
+	user2ID := mustStringPath(t, meResp2, "user", "id")
+
+	publicProfileBeforeFollow := client.mustJSON(t, http.MethodGet, cfg.APIBaseURL, "/v1/profiles/"+user2ID, accessToken1, nil, http.StatusOK)
+	if gotNickname := mustStringPath(t, publicProfileBeforeFollow, "profile", "nickname"); gotNickname != registerBody2["nickname"] {
+		t.Fatalf("unexpected public profile nickname=%s want=%v", gotNickname, registerBody2["nickname"])
+	}
+	if gotFollowers := mustInt64Path(t, publicProfileBeforeFollow, "profile", "followersCount"); gotFollowers != 0 {
+		t.Fatalf("unexpected followersCount before follow=%d want=0", gotFollowers)
+	}
+	if gotFollowing := mustInt64Path(t, publicProfileBeforeFollow, "profile", "followingCount"); gotFollowing != 0 {
+		t.Fatalf("unexpected followingCount before follow=%d want=0", gotFollowing)
+	}
+	if gotIsFollowing := mustBoolPath(t, publicProfileBeforeFollow, "profile", "isFollowing"); gotIsFollowing {
+		t.Fatalf("unexpected isFollowing before follow=true")
+	}
+
+	client.mustJSON(t, http.MethodPost, cfg.APIBaseURL, "/v1/users/"+user2ID+":follow", accessToken1, map[string]any{}, http.StatusOK)
+
+	publicProfileAfterFollow := client.mustJSON(t, http.MethodGet, cfg.APIBaseURL, "/v1/profiles/"+user2ID, accessToken1, nil, http.StatusOK)
+	if gotFollowers := mustInt64Path(t, publicProfileAfterFollow, "profile", "followersCount"); gotFollowers != 1 {
+		t.Fatalf("unexpected followersCount after follow=%d want=1", gotFollowers)
+	}
+	if gotIsFollowing := mustBoolPath(t, publicProfileAfterFollow, "profile", "isFollowing"); !gotIsFollowing {
+		t.Fatalf("unexpected isFollowing after follow=false")
+	}
+
+	publicProfileUser1 := client.mustJSON(t, http.MethodGet, cfg.APIBaseURL, "/v1/profiles/"+user1ID, accessToken1, nil, http.StatusOK)
+	if gotFollowing := mustInt64Path(t, publicProfileUser1, "profile", "followingCount"); gotFollowing != 1 {
+		t.Fatalf("unexpected user1 followingCount=%d want=1", gotFollowing)
+	}
 
 	client.mustJSON(t, http.MethodPost, cfg.APIBaseURL, "/v1/tags", accessToken1, map[string]any{"name": tagPrimary}, http.StatusOK)
 	client.mustJSON(t, http.MethodPost, cfg.APIBaseURL, "/v1/tags", accessToken1, map[string]any{"name": tagSecondary}, http.StatusOK)
@@ -255,19 +360,54 @@ func TestBackendE2EFullFlow(t *testing.T) {
 		t.Fatalf("tag %s was not found in /v1/tags", tagSecondary)
 	}
 
+	testImage := []byte{
+		0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+		0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+		0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+		0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53,
+		0xDE, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41,
+		0x54, 0x08, 0xD7, 0x63, 0x60, 0x00, 0x00, 0x00,
+		0x02, 0x00, 0x01, 0xE2, 0x21, 0xBC, 0x33, 0x00,
+		0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE,
+		0x42, 0x60, 0x82,
+	}
+
+	uploadResp := client.mustJSON(t, http.MethodPost, cfg.APIBaseURL, "/v1/polls/images:upload-url", accessToken1, map[string]any{
+		"filename":    "e2e-image.png",
+		"contentType": "image/png",
+		"sizeBytes":   len(testImage),
+	}, http.StatusOK)
+
+	objectKey := mustStringPath(t, uploadResp, "objectKey")
+	uploadURL := mustStringPath(t, uploadResp, "uploadUrl")
+	imageURL := mustStringPath(t, uploadResp, "imageUrl")
+	if !strings.HasPrefix(objectKey, "polls/") {
+		t.Fatalf("unexpected objectKey=%s", objectKey)
+	}
+	expiresInSeconds, expiresErr := int64ByPath(uploadResp, "expiresInSeconds")
+	if expiresErr != nil || expiresInSeconds <= 0 {
+		t.Fatalf("unexpected expiresInSeconds value: %v (%d)", expiresErr, expiresInSeconds)
+	}
+
+	if err := client.uploadPresigned(uploadURL, "image/png", testImage); err != nil {
+		t.Fatalf("upload image to presigned url: %v", err)
+	}
+
 	createPollResp := client.mustJSON(t, http.MethodPost, cfg.APIBaseURL, "/v1/polls", accessToken1, map[string]any{
-		"question":    question,
-		"type":        "POLL_TYPE_SINGLE_CHOICE",
-		"isAnonymous": true,
-		"endsAt":      time.Now().UTC().Add(24 * time.Hour).Format(time.RFC3339),
-		"options":     []string{"Option A", "Option B", "Option C"},
-		"tags":        []string{tagPrimary, tagSecondary},
+		"question": question,
+		"type":     "POLL_TYPE_SINGLE_CHOICE",
+		"options":  []string{"Option A", "Option B", "Option C"},
+		"tags":     []string{tagPrimary, tagSecondary},
+		"imageUrl": imageURL,
 	}, http.StatusOK)
 
 	pollID := mustStringPath(t, createPollResp, "poll", "id")
 	creatorID := mustStringPath(t, createPollResp, "poll", "creatorId")
 	if creatorID != user1ID {
 		t.Fatalf("unexpected poll creatorId=%s want=%s", creatorID, user1ID)
+	}
+	if gotImageURL := mustStringPath(t, createPollResp, "poll", "imageUrl"); gotImageURL != imageURL {
+		t.Fatalf("unexpected poll imageUrl=%s want=%s", gotImageURL, imageURL)
 	}
 
 	pollOptions := mustArrayPath(t, createPollResp, "poll", "options")
@@ -282,6 +422,9 @@ func TestBackendE2EFullFlow(t *testing.T) {
 	if gotID := mustStringPath(t, getPollResp, "poll", "id"); gotID != pollID {
 		t.Fatalf("unexpected poll id from GET /v1/polls/{id}: %s", gotID)
 	}
+	if gotImageURL := mustStringPath(t, getPollResp, "poll", "imageUrl"); gotImageURL != imageURL {
+		t.Fatalf("unexpected imageUrl from GET /v1/polls/{id}: %s want=%s", gotImageURL, imageURL)
+	}
 
 	listPollsQuery := url.Values{}
 	listPollsQuery.Set("limit", "20")
@@ -292,15 +435,14 @@ func TestBackendE2EFullFlow(t *testing.T) {
 	}
 
 	updatePollResp := client.mustJSON(t, http.MethodPatch, cfg.APIBaseURL, "/v1/polls/"+url.PathEscape(pollID), accessToken1, map[string]any{
-		"question":    updatedQuestion,
-		"isAnonymous": false,
-		"tags":        []string{tagPrimary},
+		"question": updatedQuestion,
+		"tags":     []string{tagPrimary},
 	}, http.StatusOK)
 	if gotQuestion := mustStringPath(t, updatePollResp, "poll", "question"); gotQuestion != updatedQuestion {
 		t.Fatalf("poll was not updated: question=%s want=%s", gotQuestion, updatedQuestion)
 	}
-	if gotAnon := mustBoolPath(t, updatePollResp, "poll", "isAnonymous"); gotAnon {
-		t.Fatalf("poll isAnonymous should be false after update")
+	if gotImageURL := mustStringPath(t, updatePollResp, "poll", "imageUrl"); gotImageURL != imageURL {
+		t.Fatalf("imageUrl should be preserved after update: got=%s want=%s", gotImageURL, imageURL)
 	}
 
 	forbiddenStatus, forbiddenObj, forbiddenRaw, err := client.doJSON(http.MethodPatch, cfg.APIBaseURL, "/v1/polls/"+url.PathEscape(pollID), accessToken2, map[string]any{
@@ -363,9 +505,22 @@ func TestBackendE2EFullFlow(t *testing.T) {
 		if status != http.StatusOK {
 			return false, fmt.Sprintf("status=%d body=%s", status, renderErrorBody(obj, raw)), nil
 		}
-		if _, ok := findItemByID(mustArrayPath(t, obj, "items"), pollID); !ok {
+		item, ok := findItemByID(mustArrayPath(t, obj, "items"), pollID)
+		if !ok {
 			return false, "poll is not present in feed yet", nil
 		}
+
+		feedImageURL, hasImageURL := stringByAnyKey(item, "imageUrl", "image_url")
+		if !hasImageURL {
+			return false, "poll is present in feed but imageUrl is missing", nil
+		}
+		if strings.TrimSpace(feedImageURL) != imageURL {
+			return false, fmt.Sprintf("feed imageUrl=%s want=%s", feedImageURL, imageURL), nil
+		}
+		if gotNickname := mustStringPath(t, item, "author", "nickname"); gotNickname != registerBody1["nickname"].(string) {
+			return false, fmt.Sprintf("feed author.nickname=%s want=%s", gotNickname, registerBody1["nickname"].(string)), nil
+		}
+
 		return true, "", nil
 	})
 
@@ -580,6 +735,15 @@ func mustInt32Path(t *testing.T, root map[string]any, path ...string) int32 {
 		t.Fatalf("field %s is not an int32: %v", strings.Join(path, "."), err)
 	}
 	return int32(v)
+}
+
+func mustInt64Path(t *testing.T, root map[string]any, path ...string) int64 {
+	t.Helper()
+	v, err := int64ByPath(root, path...)
+	if err != nil {
+		t.Fatalf("field %s is not an int64: %v", strings.Join(path, "."), err)
+	}
+	return v
 }
 
 func int64ByPath(root map[string]any, path ...string) (int64, error) {

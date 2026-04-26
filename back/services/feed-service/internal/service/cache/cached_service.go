@@ -94,6 +94,24 @@ func (s *feedService) GetUserPolls(ctx context.Context, userID, cursor string, l
 	return items, nextCursor, hasMore, nil
 }
 
+func (s *feedService) GetFollowingFeed(ctx context.Context, userID, cursor string, limit uint32) ([]models.FeedItem, string, bool, error) {
+	key := cacheKey("following-feed", strings.TrimSpace(userID), strings.TrimSpace(cursor), strconv.Itoa(normalizedLimit(limit)))
+	var cached responseCache
+
+	found, err := cachepkg.GetJSON(ctx, s.store, key, &cached)
+	if err == nil && found {
+		return cached.Items, cached.NextCursor, cached.HasMore, nil
+	}
+
+	items, nextCursor, hasMore, err := s.next.GetFollowingFeed(ctx, userID, cursor, limit)
+	if err != nil {
+		return nil, "", false, err
+	}
+
+	_ = cachepkg.SetJSON(ctx, s.store, key, responseCache{Items: items, NextCursor: nextCursor, HasMore: hasMore}, s.ttl)
+	return items, nextCursor, hasMore, nil
+}
+
 type responseCache struct {
 	Items      []models.FeedItem `json:"items"`
 	NextCursor string            `json:"next_cursor"`

@@ -32,7 +32,7 @@ func (g fixedIDGenerator) NewID() string {
 
 func newPollServiceForTest(polls repository.PollRepository, tags repository.TagRepository, outboxRepo repository.OutboxRepository, clock Clock, ids IDGenerator) PollService {
 	var txMgr tx.Manager
-	return NewPollService(polls, tags, outboxRepo, txMgr, clock, ids)
+	return NewPollService(polls, tags, outboxRepo, txMgr, clock, ids, nil)
 }
 
 func TestGetPollInvalidID(t *testing.T) {

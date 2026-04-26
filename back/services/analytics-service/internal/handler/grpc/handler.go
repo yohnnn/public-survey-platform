@@ -17,10 +17,7 @@ func NewHandler(svc service.AnalyticsService) *Handler {
 }
 
 func (h *Handler) GetPollAnalytics(ctx context.Context, req *analyticsv1.GetPollAnalyticsRequest) (*analyticsv1.GetPollAnalyticsResponse, error) {
-	from := timestampToTime(req.GetFrom())
-	to := timestampToTime(req.GetTo())
-
-	res, err := h.svc.GetPollAnalytics(ctx, req.GetPollId(), from, to, req.GetInterval())
+	res, err := h.svc.GetPollAnalytics(ctx, req.GetPollId())
 	if err != nil {
 		return nil, toStatusError(err)
 	}
@@ -29,10 +26,7 @@ func (h *Handler) GetPollAnalytics(ctx context.Context, req *analyticsv1.GetPoll
 }
 
 func (h *Handler) GetCountryStats(ctx context.Context, req *analyticsv1.GetCountryStatsRequest) (*analyticsv1.GetCountryStatsResponse, error) {
-	from := timestampToTime(req.GetFrom())
-	to := timestampToTime(req.GetTo())
-
-	items, err := h.svc.GetCountryStats(ctx, req.GetPollId(), from, to, req.GetInterval())
+	items, err := h.svc.GetCountryStats(ctx, req.GetPollId())
 	if err != nil {
 		return nil, toStatusError(err)
 	}
@@ -44,10 +38,7 @@ func (h *Handler) GetCountryStats(ctx context.Context, req *analyticsv1.GetCount
 }
 
 func (h *Handler) GetGenderStats(ctx context.Context, req *analyticsv1.GetGenderStatsRequest) (*analyticsv1.GetGenderStatsResponse, error) {
-	from := timestampToTime(req.GetFrom())
-	to := timestampToTime(req.GetTo())
-
-	items, err := h.svc.GetGenderStats(ctx, req.GetPollId(), from, to, req.GetInterval())
+	items, err := h.svc.GetGenderStats(ctx, req.GetPollId())
 	if err != nil {
 		return nil, toStatusError(err)
 	}
@@ -59,10 +50,7 @@ func (h *Handler) GetGenderStats(ctx context.Context, req *analyticsv1.GetGender
 }
 
 func (h *Handler) GetAgeStats(ctx context.Context, req *analyticsv1.GetAgeStatsRequest) (*analyticsv1.GetAgeStatsResponse, error) {
-	from := timestampToTime(req.GetFrom())
-	to := timestampToTime(req.GetTo())
-
-	items, err := h.svc.GetAgeStats(ctx, req.GetPollId(), from, to, req.GetInterval())
+	items, err := h.svc.GetAgeStats(ctx, req.GetPollId())
 	if err != nil {
 		return nil, toStatusError(err)
 	}

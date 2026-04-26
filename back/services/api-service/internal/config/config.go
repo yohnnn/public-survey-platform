@@ -9,7 +9,7 @@ import (
 type Config struct {
 	HTTPAddr              string
 	AllowedOrigins        []string
-	AuthGRPCEndpoint      string
+	UserGRPCEndpoint      string
 	PollGRPCEndpoint      string
 	VoteGRPCEndpoint      string
 	FeedGRPCEndpoint      string
@@ -20,7 +20,7 @@ func Load() (Config, error) {
 	cfg := Config{
 		HTTPAddr:              getEnv("HTTP_ADDR", ":8080"),
 		AllowedOrigins:        getEnvCSV("ALLOWED_ORIGINS"),
-		AuthGRPCEndpoint:      strings.TrimSpace(getEnv("AUTH_GRPC_ENDPOINT", "")),
+		UserGRPCEndpoint:      strings.TrimSpace(getEnv("USER_GRPC_ENDPOINT", "")),
 		PollGRPCEndpoint:      strings.TrimSpace(getEnv("POLL_GRPC_ENDPOINT", "")),
 		VoteGRPCEndpoint:      strings.TrimSpace(getEnv("VOTE_GRPC_ENDPOINT", "")),
 		FeedGRPCEndpoint:      strings.TrimSpace(getEnv("FEED_GRPC_ENDPOINT", "")),
@@ -34,8 +34,8 @@ func Load() (Config, error) {
 		}
 	}
 
-	if cfg.AuthGRPCEndpoint == "" {
-		return Config{}, fmt.Errorf("AUTH_GRPC_ENDPOINT is required")
+	if cfg.UserGRPCEndpoint == "" {
+		return Config{}, fmt.Errorf("USER_GRPC_ENDPOINT is required")
 	}
 	if cfg.PollGRPCEndpoint == "" {
 		return Config{}, fmt.Errorf("POLL_GRPC_ENDPOINT is required")

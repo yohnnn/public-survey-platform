@@ -1,0 +1,2 @@
+ALTER TABLE polls
+    ADD COLUMN IF NOT EXISTS is_anonymous BOOLEAN NOT NULL DEFAULT false;

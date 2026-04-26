@@ -1,0 +1,2 @@
+ALTER TABLE polls
+    DROP COLUMN IF EXISTS image_url;

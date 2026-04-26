@@ -6,44 +6,21 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	analyticsv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/analytics/v1"
-	authv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/auth/v1"
 	feedv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/feed/v1"
 	pollv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/poll/v1"
+	userv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/user/v1"
 	votev1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/vote/v1"
 	applogger "github.com/yohnnn/public-survey-platform/back/pkg/logger"
 	"github.com/yohnnn/public-survey-platform/back/services/api-service/internal/config"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
-)
-
-var (
-	httpRequestsTotal = promauto.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "psp_api_http_requests_total",
-			Help: "Total number of HTTP requests handled by api-service gateway.",
-		},
-		[]string{"method", "status_code"},
-	)
-
-	httpRequestDuration = promauto.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "psp_api_http_request_duration_seconds",
-			Help:    "HTTP request duration in seconds for api-service gateway.",
-			Buckets: prometheus.DefBuckets,
-		},
-		[]string{"method", "status_code"},
-	)
 )
 
 func main() {
@@ -77,7 +54,7 @@ func main() {
 	)
 
 	dialOptions := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
-	if err := authv1.RegisterAuthServiceHandlerFromEndpoint(ctx, mux, cfg.AuthGRPCEndpoint, dialOptions); err != nil {
+	if err := userv1.RegisterUserServiceHandlerFromEndpoint(ctx, mux, cfg.UserGRPCEndpoint, dialOptions); err != nil {
 		logger.Fatalf("register auth gateway handlers: %v", err)
 	}
 	if err := pollv1.RegisterPollServiceHandlerFromEndpoint(ctx, mux, cfg.PollGRPCEndpoint, dialOptions); err != nil {
@@ -93,16 +70,10 @@ func main() {
 		logger.Fatalf("register analytics gateway handlers: %v", err)
 	}
 
-	metricsHandler := promhttp.Handler()
-
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && r.URL.Path == "/healthz" {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte("ok"))
-			return
-		}
-		if r.Method == http.MethodGet && r.URL.Path == "/metrics" {
-			metricsHandler.ServeHTTP(w, r)
 			return
 		}
 		mux.ServeHTTP(w, r)
@@ -149,10 +120,6 @@ func requestLoggingMiddleware(logger *slog.Logger, next http.Handler) http.Handl
 		start := time.Now()
 		wrapped := &statusResponseWriter{ResponseWriter: w, statusCode: http.StatusOK}
 		next.ServeHTTP(wrapped, r)
-
-		statusCode := strconv.Itoa(wrapped.statusCode)
-		httpRequestsTotal.WithLabelValues(r.Method, statusCode).Inc()
-		httpRequestDuration.WithLabelValues(r.Method, statusCode).Observe(time.Since(start).Seconds())
 
 		logger.InfoContext(r.Context(), "http request completed",
 			"component", "http",

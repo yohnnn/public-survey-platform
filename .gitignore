@@ -1,1 +1,39 @@
+# Local environment
 .env
+**/.env
+.env.*
+**/.env.*
+!.env.example
+!**/.env.example
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# Go
+bin/
+**/bin/
+*.out
+*.test
+coverage.out
+**/coverage.out
+back/services/*/*-service
+
+# Frontend package managers/build outputs
+node_modules/
+dist/
+build/
+coverage/

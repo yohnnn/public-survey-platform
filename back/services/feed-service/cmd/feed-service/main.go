@@ -17,8 +17,8 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
-	authv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/auth/v1"
 	feedv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/feed/v1"
+	userv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/user/v1"
 	"github.com/yohnnn/public-survey-platform/back/pkg/events"
 	"github.com/yohnnn/public-survey-platform/back/pkg/grpcinterceptor"
 	applogger "github.com/yohnnn/public-survey-platform/back/pkg/logger"
@@ -49,16 +49,16 @@ func main() {
 	}
 	defer pool.Close()
 
-	authConn, err := grpc.NewClient(cfg.AuthGRPCEndpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	authConn, err := grpc.NewClient(cfg.UserGRPCEndpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		logger.Fatalf("connect to auth service: %v", err)
+		logger.Fatalf("connect to user service: %v", err)
 	}
 	defer authConn.Close()
-	authClient := authv1.NewAuthServiceClient(authConn)
+	userClient := userv1.NewUserServiceClient(authConn)
 
 	feedRepo := postgres.NewFeedRepository(pool)
 	txMgr := tx.NewManager(pool)
-	feedSvc := service.NewFeedService(feedRepo)
+	feedSvc := service.NewFeedService(feedRepo, userClient)
 	if cfg.RedisAddr != "" {
 		cacheStore := redisstore.New(redisstore.Config{
 			Addr:     cfg.RedisAddr,
@@ -101,7 +101,7 @@ func main() {
 
 	authInterceptor := grpcinterceptor.UnaryAuthInterceptor(
 		func(ctx context.Context, token string) (string, error) {
-			resp, err := authClient.ValidateToken(ctx, &authv1.ValidateTokenRequest{AccessToken: token})
+			resp, err := userClient.ValidateToken(ctx, &userv1.ValidateTokenRequest{AccessToken: token})
 			if err != nil {
 				return "", err
 			}

@@ -1,13 +1,13 @@
 swagger: "2.0"
 info:
-  title: analytics/v1/analytics.proto
+  title: common/v1/errors.proto
   version: version not set
 tags:
-  - name: AnalyticsService
-  - name: AuthService
-  - name: FeedService
+  - name: UserService
   - name: PollService
   - name: VoteService
+  - name: FeedService
+  - name: AnalyticsService
 consumes:
   - application/json
 produces:
@@ -15,7 +15,7 @@ produces:
 paths:
   /v1/auth/login:
     post:
-      operationId: AuthService_Login
+      operationId: UserService_Login
       responses:
         "200":
           description: A successful response.
@@ -32,10 +32,10 @@ paths:
           schema:
             $ref: '#/definitions/v1LoginRequest'
       tags:
-        - AuthService
+        - UserService
   /v1/auth/logout:
     post:
-      operationId: AuthService_Logout
+      operationId: UserService_Logout
       responses:
         "200":
           description: A successful response.
@@ -52,10 +52,10 @@ paths:
           schema:
             $ref: '#/definitions/v1LogoutRequest'
       tags:
-        - AuthService
+        - UserService
   /v1/auth/logout-all:
     post:
-      operationId: AuthService_LogoutAll
+      operationId: UserService_LogoutAll
       responses:
         "200":
           description: A successful response.
@@ -72,43 +72,10 @@ paths:
           schema:
             $ref: '#/definitions/v1LogoutAllRequest'
       tags:
-        - AuthService
-  /v1/auth/me:
-    get:
-      operationId: AuthService_GetUser
-      responses:
-        "200":
-          description: A successful response.
-          schema:
-            $ref: '#/definitions/v1GetUserResponse'
-        default:
-          description: An unexpected error response.
-          schema:
-            $ref: '#/definitions/rpcStatus'
-      tags:
-        - AuthService
-    patch:
-      operationId: AuthService_UpdateUser
-      responses:
-        "200":
-          description: A successful response.
-          schema:
-            $ref: '#/definitions/v1UpdateUserResponse'
-        default:
-          description: An unexpected error response.
-          schema:
-            $ref: '#/definitions/rpcStatus'
-      parameters:
-        - name: body
-          in: body
-          required: true
-          schema:
-            $ref: '#/definitions/v1UpdateUserRequest'
-      tags:
-        - AuthService
+        - UserService
   /v1/auth/refresh:
     post:
-      operationId: AuthService_RefreshToken
+      operationId: UserService_RefreshToken
       responses:
         "200":
           description: A successful response.
@@ -125,10 +92,10 @@ paths:
           schema:
             $ref: '#/definitions/v1RefreshTokenRequest'
       tags:
-        - AuthService
+        - UserService
   /v1/auth/register:
     post:
-      operationId: AuthService_Register
+      operationId: UserService_Register
       responses:
         "200":
           description: A successful response.
@@ -145,7 +112,7 @@ paths:
           schema:
             $ref: '#/definitions/v1RegisterRequest'
       tags:
-        - AuthService
+        - UserService
   /v1/feed:
     get:
       operationId: FeedService_GetFeed
@@ -179,6 +146,30 @@ paths:
           items:
             type: string
           collectionFormat: multi
+      tags:
+        - FeedService
+  /v1/feed/following:
+    get:
+      operationId: FeedService_GetFollowingFeed
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1GetFeedResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          type: string
+        - name: limit
+          in: query
+          required: false
+          type: integer
+          format: int64
       tags:
         - FeedService
   /v1/feed/me:
@@ -307,6 +298,26 @@ paths:
             $ref: '#/definitions/v1CreatePollRequest'
       tags:
         - PollService
+  /v1/polls/images:upload-url:
+    post:
+      operationId: PollService_CreatePollImageUploadURL
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1CreatePollImageUploadURLResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: body
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/v1CreatePollImageUploadURLRequest'
+      tags:
+        - PollService
   /v1/polls/{id}:
     get:
       operationId: PollService_GetPoll
@@ -384,20 +395,6 @@ paths:
           in: path
           required: true
           type: string
-        - name: from
-          in: query
-          required: false
-          type: string
-          format: date-time
-        - name: to
-          in: query
-          required: false
-          type: string
-          format: date-time
-        - name: interval
-          in: query
-          required: false
-          type: string
       tags:
         - AnalyticsService
   /v1/polls/{pollId}/analytics/age:
@@ -416,20 +413,6 @@ paths:
         - name: pollId
           in: path
           required: true
-          type: string
-        - name: from
-          in: query
-          required: false
-          type: string
-          format: date-time
-        - name: to
-          in: query
-          required: false
-          type: string
-          format: date-time
-        - name: interval
-          in: query
-          required: false
           type: string
       tags:
         - AnalyticsService
@@ -450,20 +433,6 @@ paths:
           in: path
           required: true
           type: string
-        - name: from
-          in: query
-          required: false
-          type: string
-          format: date-time
-        - name: to
-          in: query
-          required: false
-          type: string
-          format: date-time
-        - name: interval
-          in: query
-          required: false
-          type: string
       tags:
         - AnalyticsService
   /v1/polls/{pollId}/analytics/gender:
@@ -482,20 +451,6 @@ paths:
         - name: pollId
           in: path
           required: true
-          type: string
-        - name: from
-          in: query
-          required: false
-          type: string
-          format: date-time
-        - name: to
-          in: query
-          required: false
-          type: string
-          format: date-time
-        - name: interval
-          in: query
-          required: false
           type: string
       tags:
         - AnalyticsService
@@ -559,6 +514,25 @@ paths:
             $ref: '#/definitions/VoteServiceVoteBody'
       tags:
         - VoteService
+  /v1/profiles/{userId}:
+    get:
+      operationId: UserService_GetPublicProfile
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1GetPublicProfileResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          type: string
+      tags:
+        - UserService
   /v1/tags:
     get:
       operationId: PollService_ListTags
@@ -592,6 +566,39 @@ paths:
             $ref: '#/definitions/v1CreateTagRequest'
       tags:
         - PollService
+  /v1/users/me:
+    get:
+      operationId: UserService_GetMyUser
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1GetMyUserResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      tags:
+        - UserService
+    patch:
+      operationId: UserService_UpdateMyUser
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1UpdateMyUserResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: body
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/v1UpdateMyUserRequest'
+      tags:
+        - UserService
   /v1/users/{userId}/polls:
     get:
       operationId: FeedService_GetUserPolls2
@@ -620,21 +627,62 @@ paths:
           format: int64
       tags:
         - FeedService
+  /v1/users/{userId}:follow:
+    delete:
+      operationId: UserService_UnfollowUser
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1UnfollowUserResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          type: string
+      tags:
+        - UserService
+    post:
+      operationId: UserService_FollowUser
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1FollowUserResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          type: string
+        - name: body
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/UserServiceFollowUserBody'
+      tags:
+        - UserService
 definitions:
   PollServiceUpdatePollBody:
     type: object
     properties:
       question:
         type: string
-      isAnonymous:
-        type: boolean
-      endsAt:
-        type: string
-        format: date-time
       tags:
         type: array
         items:
           type: string
+      imageUrl:
+        type: string
+  UserServiceFollowUserBody:
+    type: object
   VoteServiceVoteBody:
     type: object
     properties:
@@ -687,6 +735,28 @@ definitions:
       votes:
         type: string
         format: int64
+  v1CreatePollImageUploadURLRequest:
+    type: object
+    properties:
+      filename:
+        type: string
+      contentType:
+        type: string
+      sizeBytes:
+        type: string
+        format: int64
+  v1CreatePollImageUploadURLResponse:
+    type: object
+    properties:
+      objectKey:
+        type: string
+      uploadUrl:
+        type: string
+      imageUrl:
+        type: string
+      expiresInSeconds:
+        type: string
+        format: int64
   v1CreatePollRequest:
     type: object
     properties:
@@ -694,11 +764,6 @@ definitions:
         type: string
       type:
         $ref: '#/definitions/v1PollType'
-      isAnonymous:
-        type: boolean
-      endsAt:
-        type: string
-        format: date-time
       options:
         type: array
         items:
@@ -707,6 +772,8 @@ definitions:
         type: array
         items:
           type: string
+      imageUrl:
+        type: string
   v1CreatePollResponse:
     type: object
     properties:
@@ -737,6 +804,13 @@ definitions:
     properties:
       success:
         type: boolean
+  v1FeedAuthor:
+    type: object
+    properties:
+      id:
+        type: string
+      nickname:
+        type: string
   v1FeedItem:
     type: object
     properties:
@@ -759,6 +833,10 @@ definitions:
       createdAt:
         type: string
         format: date-time
+      imageUrl:
+        type: string
+      author:
+        $ref: '#/definitions/v1FeedAuthor'
   v1FeedOption:
     type: object
     properties:
@@ -769,6 +847,11 @@ definitions:
       votesCount:
         type: string
         format: int64
+  v1FollowUserResponse:
+    type: object
+    properties:
+      success:
+        type: boolean
   v1GenderStat:
     type: object
     properties:
@@ -817,6 +900,11 @@ definitions:
         items:
           type: object
           $ref: '#/definitions/v1GenderStat'
+  v1GetMyUserResponse:
+    type: object
+    properties:
+      user:
+        $ref: '#/definitions/v1User'
   v1GetPollAnalyticsResponse:
     type: object
     properties:
@@ -850,6 +938,11 @@ definitions:
     properties:
       poll:
         $ref: '#/definitions/v1Poll'
+  v1GetPublicProfileResponse:
+    type: object
+    properties:
+      profile:
+        $ref: '#/definitions/v1PublicUserProfile'
   v1GetTrendingResponse:
     type: object
     properties:
@@ -870,11 +963,6 @@ definitions:
           $ref: '#/definitions/v1FeedItem'
       page:
         $ref: '#/definitions/v1CursorPageMeta'
-  v1GetUserResponse:
-    type: object
-    properties:
-      user:
-        $ref: '#/definitions/v1User'
   v1GetUserVoteResponse:
     type: object
     properties:
@@ -957,11 +1045,6 @@ definitions:
         type: string
       type:
         $ref: '#/definitions/v1PollType'
-      isAnonymous:
-        type: boolean
-      endsAt:
-        type: string
-        format: date-time
       createdAt:
         type: string
         format: date-time
@@ -977,6 +1060,8 @@ definitions:
         type: array
         items:
           type: string
+      imageUrl:
+        type: string
   v1PollOption:
     type: object
     properties:
@@ -994,6 +1079,21 @@ definitions:
       - POLL_TYPE_SINGLE_CHOICE
       - POLL_TYPE_MULTIPLE_CHOICE
     default: POLL_TYPE_UNSPECIFIED
+  v1PublicUserProfile:
+    type: object
+    properties:
+      id:
+        type: string
+      nickname:
+        type: string
+      followersCount:
+        type: string
+        format: int64
+      followingCount:
+        type: string
+        format: int64
+      isFollowing:
+        type: boolean
   v1RefreshTokenRequest:
     type: object
     properties:
@@ -1010,6 +1110,8 @@ definitions:
       email:
         type: string
       password:
+        type: string
+      nickname:
         type: string
       country:
         type: string
@@ -1038,15 +1140,17 @@ definitions:
       createdAt:
         type: string
         format: date-time
-  v1UpdatePollResponse:
+  v1UnfollowUserResponse:
     type: object
     properties:
-      poll:
-        $ref: '#/definitions/v1Poll'
-  v1UpdateUserRequest:
+      success:
+        type: boolean
+  v1UpdateMyUserRequest:
     type: object
     properties:
       email:
+        type: string
+      nickname:
         type: string
       country:
         type: string
@@ -1055,15 +1159,22 @@ definitions:
       birthYear:
         type: integer
         format: int32
-  v1UpdateUserResponse:
+  v1UpdateMyUserResponse:
     type: object
     properties:
       user:
         $ref: '#/definitions/v1User'
+  v1UpdatePollResponse:
+    type: object
+    properties:
+      poll:
+        $ref: '#/definitions/v1Poll'
   v1User:
     type: object
     properties:
       id:
+        type: string
+      nickname:
         type: string
       email:
         type: string

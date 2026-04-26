@@ -8,7 +8,7 @@ BUF ?= /home/yohn/go/bin/buf
 COMPOSE ?= docker compose -f ../docker-compose.yml
 SERVICE_DIRS := \
 	services/api-service \
-	services/auth-service \
+	services/user-service \
 	services/poll-service \
 	services/vote-service \
 	services/feed-service \

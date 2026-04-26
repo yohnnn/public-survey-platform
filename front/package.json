@@ -1,0 +1,9 @@
+{
+  "name": "public-survey-platform-front",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "start": "python3 server.py",
+    "check": "node --check app.js"
+  }
+}
