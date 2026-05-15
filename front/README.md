@@ -1,24 +1,43 @@
-# Front
+# Frontend
 
-Статический пользовательский frontend без сборщика и внешних зависимостей.
+React + TypeScript приложение на Vite.
 
-Запуск:
+## Запуск
 
 ```bash
-cd front
-python3 server.py
+npm install
+npm run dev
 ```
 
-После этого открыть:
+Приложение будет доступно на:
 
 ```text
 http://localhost:3000
 ```
 
-По умолчанию фронт ходит в backend API:
+Backend API ожидается на `http://localhost:8080`. В dev-режиме Vite проксирует `/v1/*` и `/healthz` на backend, а `/__upload_proxy` используется для загрузки изображений в MinIO по presigned URL.
 
-```text
-http://localhost:8080
+## Production
+
+```bash
+npm run build
+npm run start
 ```
 
-`server.py` нужен не только для статики, но и для proxy загрузки картинок в MinIO через presigned URL.
+`server.mjs` отдает собранный `dist`, проксирует `/v1/*` и `/healthz` на backend, а также поддерживает `/__upload_proxy`.
+
+Настройки:
+
+```text
+PORT=3000
+API_PROXY_TARGET=http://localhost:8080
+```
+
+## Команды
+
+```bash
+npm run typecheck
+npm run build
+npm run start
+npm run preview
+```

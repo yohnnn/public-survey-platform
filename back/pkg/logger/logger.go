@@ -12,7 +12,6 @@ import (
 
 const RequestIDHeader = "X-Request-Id"
 
-// Logger is an application logger wrapper that exposes both slog and stdlog APIs.
 type Logger struct {
 	logger *slog.Logger
 }

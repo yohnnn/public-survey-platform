@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 	"net"
 	"os"
@@ -22,6 +21,7 @@ import (
 	"github.com/yohnnn/public-survey-platform/back/pkg/events"
 	"github.com/yohnnn/public-survey-platform/back/pkg/grpcinterceptor"
 	applogger "github.com/yohnnn/public-survey-platform/back/pkg/logger"
+	appmetrics "github.com/yohnnn/public-survey-platform/back/pkg/metrics"
 	"github.com/yohnnn/public-survey-platform/back/pkg/tx"
 	"github.com/yohnnn/public-survey-platform/back/services/feed-service/internal/config"
 	grpcHandler "github.com/yohnnn/public-survey-platform/back/services/feed-service/internal/handler/grpc"
@@ -42,6 +42,7 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	appmetrics.StartServerFromEnv(ctx, ":9105", logger)
 
 	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {
@@ -49,12 +50,12 @@ func main() {
 	}
 	defer pool.Close()
 
-	authConn, err := grpc.NewClient(cfg.UserGRPCEndpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	userConn, err := grpc.NewClient(cfg.UserGRPCEndpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		logger.Fatalf("connect to user service: %v", err)
 	}
-	defer authConn.Close()
-	userClient := userv1.NewUserServiceClient(authConn)
+	defer userConn.Close()
+	userClient := userv1.NewUserServiceClient(userConn)
 
 	feedRepo := postgres.NewFeedRepository(pool)
 	txMgr := tx.NewManager(pool)
@@ -99,17 +100,7 @@ func main() {
 		}
 	}()
 
-	authInterceptor := grpcinterceptor.UnaryAuthInterceptor(
-		func(ctx context.Context, token string) (string, error) {
-			resp, err := userClient.ValidateToken(ctx, &userv1.ValidateTokenRequest{AccessToken: token})
-			if err != nil {
-				return "", err
-			}
-			if !resp.GetValid() {
-				return "", fmt.Errorf("token is not valid")
-			}
-			return resp.GetUserId(), nil
-		},
+	authInterceptor := grpcinterceptor.UnaryUserIDInterceptor(
 		map[string]struct{}{
 			feedv1.FeedService_GetFeed_FullMethodName:      {},
 			feedv1.FeedService_GetTrending_FullMethodName:  {},
@@ -119,7 +110,7 @@ func main() {
 	loggingInterceptor := grpcinterceptor.UnaryLoggingInterceptor(serviceLogger.Slog())
 
 	srv := grpc.NewServer(
-		grpc.ChainUnaryInterceptor(loggingInterceptor, authInterceptor),
+		grpc.ChainUnaryInterceptor(appmetrics.UnaryServerInterceptor("feed-service"), loggingInterceptor, authInterceptor),
 	)
 	feedv1.RegisterFeedServiceServer(srv, grpcHandler.NewHandler(feedSvc))
 	reflection.Register(srv)

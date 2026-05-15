@@ -24,14 +24,14 @@ import (
 type voteService struct {
 	repo       repository.VoteRepository
 	outbox     repository.OutboxRepository
-	authClient userv1.UserServiceClient
+	userClient userv1.UserServiceClient
 	pollClient pollv1.PollServiceClient
-	tx         tx.Manager
+	tx         tx.Runner
 	clock      Clock
 }
 
-func NewVoteService(repo repository.VoteRepository, outbox repository.OutboxRepository, authClient userv1.UserServiceClient, pollClient pollv1.PollServiceClient, tx tx.Manager, clock Clock) VoteService {
-	return &voteService{repo: repo, outbox: outbox, authClient: authClient, pollClient: pollClient, tx: tx, clock: clock}
+func NewVoteService(repo repository.VoteRepository, outbox repository.OutboxRepository, userClient userv1.UserServiceClient, pollClient pollv1.PollServiceClient, tx tx.Runner, clock Clock) VoteService {
+	return &voteService{repo: repo, outbox: outbox, userClient: userClient, pollClient: pollClient, tx: tx, clock: clock}
 }
 
 func (s *voteService) Vote(ctx context.Context, userID, pollID string, optionIDs []string) ([]string, time.Time, error) {
@@ -48,19 +48,22 @@ func (s *voteService) Vote(ctx context.Context, userID, pollID string, optionIDs
 		return nil, time.Time{}, models.ErrInvalidArgument
 	}
 
-	poll, err := s.getPoll(ctx, pollID)
-	if err != nil {
-		return nil, time.Time{}, err
-	}
-
-	if err := validateSelectedOptions(poll, normalizedOptions); err != nil {
-		return nil, time.Time{}, err
-	}
-
 	now := s.clock.Now().UTC()
 	voterMeta := s.getVoterMeta(ctx)
 	responseVotedAt := now
 	if err := s.tx.WithTx(ctx, func(txCtx context.Context) error {
+		if err := s.repo.LockUserVote(txCtx, userID, pollID); err != nil {
+			return err
+		}
+
+		poll, err := s.getPoll(txCtx, pollID)
+		if err != nil {
+			return err
+		}
+		if err := validateSelectedOptions(poll, normalizedOptions); err != nil {
+			return err
+		}
+
 		existingOptionIDs, existingVotedAt, err := s.repo.GetUserVote(txCtx, userID, pollID)
 		if err != nil {
 			return err
@@ -342,7 +345,7 @@ func diffOptionIDs(previous, current []string) ([]string, []string) {
 }
 
 func (s *voteService) getVoterMeta(ctx context.Context) voterMeta {
-	if s.authClient == nil {
+	if s.userClient == nil {
 		return voterMeta{}
 	}
 
@@ -359,7 +362,7 @@ func (s *voteService) getVoterMeta(ctx context.Context) voterMeta {
 	outMD := metadata.Pairs("authorization", authVals[0])
 	outCtx := metadata.NewOutgoingContext(ctx, outMD)
 
-	resp, err := s.authClient.GetMyUser(outCtx, &userv1.GetMyUserRequest{})
+	resp, err := s.userClient.GetMyUser(outCtx, &userv1.GetMyUserRequest{})
 	if err != nil || resp.GetUser() == nil {
 		return voterMeta{}
 	}

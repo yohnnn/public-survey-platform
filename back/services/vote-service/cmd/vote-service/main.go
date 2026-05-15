@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 	"net"
 	"os"
@@ -22,6 +21,7 @@ import (
 	"github.com/yohnnn/public-survey-platform/back/pkg/events"
 	"github.com/yohnnn/public-survey-platform/back/pkg/grpcinterceptor"
 	applogger "github.com/yohnnn/public-survey-platform/back/pkg/logger"
+	appmetrics "github.com/yohnnn/public-survey-platform/back/pkg/metrics"
 	"github.com/yohnnn/public-survey-platform/back/pkg/outbox"
 	"github.com/yohnnn/public-survey-platform/back/pkg/tx"
 	"github.com/yohnnn/public-survey-platform/back/services/vote-service/internal/config"
@@ -41,6 +41,7 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	appmetrics.StartServerFromEnv(ctx, ":9104", logger)
 
 	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {
@@ -48,12 +49,12 @@ func main() {
 	}
 	defer pool.Close()
 
-	authConn, err := grpc.NewClient(cfg.UserGRPCEndpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	userConn, err := grpc.NewClient(cfg.UserGRPCEndpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		logger.Fatalf("connect to user service: %v", err)
 	}
-	defer authConn.Close()
-	authClient := userv1.NewUserServiceClient(authConn)
+	defer userConn.Close()
+	userClient := userv1.NewUserServiceClient(userConn)
 
 	pollConn, err := grpc.NewClient(cfg.PollGRPCEndpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -65,7 +66,7 @@ func main() {
 	voteRepo := postgres.NewVoteRepository(pool)
 	outboxRepo := postgres.NewOutboxRepository(pool)
 	txMgr := tx.NewManager(pool)
-	voteSvc := service.NewVoteService(voteRepo, outboxRepo, authClient, pollClient, *txMgr, service.NewSystemClock())
+	voteSvc := service.NewVoteService(voteRepo, outboxRepo, userClient, pollClient, txMgr, service.NewSystemClock())
 
 	var publisher events.Publisher = events.NewLogPublisher(logger)
 	if cfg.EventPublisher == "kafka" {
@@ -94,23 +95,11 @@ func main() {
 		}
 	}()
 
-	authInterceptor := grpcinterceptor.UnaryAuthInterceptor(
-		func(ctx context.Context, token string) (string, error) {
-			resp, err := authClient.ValidateToken(ctx, &userv1.ValidateTokenRequest{AccessToken: token})
-			if err != nil {
-				return "", err
-			}
-			if !resp.GetValid() {
-				return "", fmt.Errorf("token is not valid")
-			}
-			return resp.GetUserId(), nil
-		},
-		nil,
-	)
+	authInterceptor := grpcinterceptor.UnaryUserIDInterceptor(nil)
 	loggingInterceptor := grpcinterceptor.UnaryLoggingInterceptor(serviceLogger.Slog())
 
 	srv := grpc.NewServer(
-		grpc.ChainUnaryInterceptor(loggingInterceptor, authInterceptor),
+		grpc.ChainUnaryInterceptor(appmetrics.UnaryServerInterceptor("vote-service"), loggingInterceptor, authInterceptor),
 	)
 	votev1.RegisterVoteServiceServer(srv, grpcHandler.NewHandler(voteSvc))
 	reflection.Register(srv)

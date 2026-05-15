@@ -72,6 +72,20 @@ func (mr *MockVoteRepositoryMockRecorder) GetUserVote(ctx, userID, pollID any) *
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserVote", reflect.TypeOf((*MockVoteRepository)(nil).GetUserVote), ctx, userID, pollID)
 }
 
+// LockUserVote mocks base method.
+func (m *MockVoteRepository) LockUserVote(ctx context.Context, userID, pollID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LockUserVote", ctx, userID, pollID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// LockUserVote indicates an expected call of LockUserVote.
+func (mr *MockVoteRepositoryMockRecorder) LockUserVote(ctx, userID, pollID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LockUserVote", reflect.TypeOf((*MockVoteRepository)(nil).LockUserVote), ctx, userID, pollID)
+}
+
 // ReplaceUserVote mocks base method.
 func (m *MockVoteRepository) ReplaceUserVote(ctx context.Context, userID, pollID string, optionIDs []string, createdAt time.Time) error {
 	m.ctrl.T.Helper()

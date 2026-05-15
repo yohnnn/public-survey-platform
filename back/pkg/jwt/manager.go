@@ -1,4 +1,4 @@
-package security
+package jwt
 
 import (
 	"errors"
@@ -25,6 +25,12 @@ func NewJWTManager(secret string, accessTTL, refreshTTL time.Duration) *JWTManag
 		secret:     []byte(secret),
 		accessTTL:  accessTTL,
 		refreshTTL: refreshTTL,
+	}
+}
+
+func NewJWTValidator(secret string) *JWTManager {
+	return &JWTManager{
+		secret: []byte(secret),
 	}
 }
 

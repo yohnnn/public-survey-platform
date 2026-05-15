@@ -42,6 +42,12 @@ func (r *VoteRepository) DeleteUserVote(ctx context.Context, userID, pollID stri
 	return err
 }
 
+func (r *VoteRepository) LockUserVote(ctx context.Context, userID, pollID string) error {
+	exec := tx.Executor(ctx, r.pool)
+	_, err := exec.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, userID+":"+pollID)
+	return err
+}
+
 func (r *VoteRepository) GetUserVote(ctx context.Context, userID, pollID string) ([]string, *time.Time, error) {
 	exec := tx.Executor(ctx, r.pool)
 	rows, err := exec.Query(ctx, `
@@ -49,6 +55,7 @@ func (r *VoteRepository) GetUserVote(ctx context.Context, userID, pollID string)
 		FROM votes
 		WHERE user_id = $1 AND poll_id = $2
 		ORDER BY option_id ASC
+		FOR UPDATE
 	`, userID, pollID)
 	if err != nil {
 		return nil, nil, err

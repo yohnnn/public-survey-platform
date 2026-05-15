@@ -7,7 +7,6 @@ import (
 	"time"
 
 	pollv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/poll/v1"
-	"github.com/yohnnn/public-survey-platform/back/pkg/tx"
 	"github.com/yohnnn/public-survey-platform/back/services/vote-service/internal/models"
 	mockrepo "github.com/yohnnn/public-survey-platform/back/services/vote-service/internal/service/mock"
 	"go.uber.org/mock/gomock"
@@ -23,9 +22,14 @@ func (c fixedVoteClock) Now() time.Time {
 	return c.now
 }
 
+type noopTxRunner struct{}
+
+func (noopTxRunner) WithTx(_ context.Context, fn func(ctx context.Context) error) error {
+	return fn(context.Background())
+}
+
 func newVoteServiceForTest(repo *mockrepo.MockVoteRepository, pollClient pollv1.PollServiceClient) VoteService {
-	var txMgr tx.Manager
-	return NewVoteService(repo, nil, nil, pollClient, txMgr, fixedVoteClock{now: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)})
+	return NewVoteService(repo, nil, nil, pollClient, noopTxRunner{}, fixedVoteClock{now: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)})
 }
 
 func TestVoteRejectsInvalidArguments(t *testing.T) {
@@ -57,6 +61,8 @@ func TestVoteMapsPollNotFound(t *testing.T) {
 	defer ctrl.Finish()
 
 	repo := mockrepo.NewMockVoteRepository(ctrl)
+	repo.EXPECT().LockUserVote(gomock.Any(), "user-1", "poll-1").Return(nil)
+
 	pollClient := mockrepo.NewMockPollServiceClient(ctrl)
 	pollClient.EXPECT().GetPoll(gomock.Any(), &pollv1.GetPollRequest{Id: "poll-1"}).Return(nil, status.Error(codes.NotFound, "not found"))
 
@@ -72,6 +78,8 @@ func TestVoteRejectsInvalidOptionBeforeTransaction(t *testing.T) {
 	defer ctrl.Finish()
 
 	repo := mockrepo.NewMockVoteRepository(ctrl)
+	repo.EXPECT().LockUserVote(gomock.Any(), "user-1", "poll-1").Return(nil)
+
 	pollClient := mockrepo.NewMockPollServiceClient(ctrl)
 	pollClient.EXPECT().GetPoll(gomock.Any(), &pollv1.GetPollRequest{Id: "poll-1"}).Return(
 		&pollv1.GetPollResponse{

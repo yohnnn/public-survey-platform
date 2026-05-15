@@ -8,6 +8,7 @@ import (
 )
 
 type VoteRepository interface {
+	LockUserVote(ctx context.Context, userID, pollID string) error
 	ReplaceUserVote(ctx context.Context, userID, pollID string, optionIDs []string, createdAt time.Time) error
 	DeleteUserVote(ctx context.Context, userID, pollID string) error
 	GetUserVote(ctx context.Context, userID, pollID string) ([]string, *time.Time, error)

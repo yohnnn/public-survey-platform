@@ -19,6 +19,7 @@ import (
 	"github.com/yohnnn/public-survey-platform/back/pkg/events"
 	"github.com/yohnnn/public-survey-platform/back/pkg/grpcinterceptor"
 	applogger "github.com/yohnnn/public-survey-platform/back/pkg/logger"
+	appmetrics "github.com/yohnnn/public-survey-platform/back/pkg/metrics"
 	"github.com/yohnnn/public-survey-platform/back/pkg/tx"
 	"github.com/yohnnn/public-survey-platform/back/services/analytics-service/internal/config"
 	grpcHandler "github.com/yohnnn/public-survey-platform/back/services/analytics-service/internal/handler/grpc"
@@ -39,6 +40,7 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	appmetrics.StartServerFromEnv(ctx, ":9106", logger)
 
 	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {
@@ -90,7 +92,7 @@ func main() {
 	}()
 
 	loggingInterceptor := grpcinterceptor.UnaryLoggingInterceptor(serviceLogger.Slog())
-	srv := grpc.NewServer(grpc.ChainUnaryInterceptor(loggingInterceptor))
+	srv := grpc.NewServer(grpc.ChainUnaryInterceptor(appmetrics.UnaryServerInterceptor("analytics-service"), loggingInterceptor))
 
 	analyticsv1.RegisterAnalyticsServiceServer(srv, grpcHandler.NewHandler(analyticsSvc))
 	reflection.Register(srv)

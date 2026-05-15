@@ -17,6 +17,10 @@ type DBTX interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
 }
 
+type Runner interface {
+	WithTx(ctx context.Context, fn func(ctx context.Context) error) error
+}
+
 type Manager struct {
 	pool *pgxpool.Pool
 }

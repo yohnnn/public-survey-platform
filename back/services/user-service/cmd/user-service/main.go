@@ -14,6 +14,8 @@ import (
 	userv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/user/v1"
 	"github.com/yohnnn/public-survey-platform/back/pkg/grpcinterceptor"
 	applogger "github.com/yohnnn/public-survey-platform/back/pkg/logger"
+	appmetrics "github.com/yohnnn/public-survey-platform/back/pkg/metrics"
+	"github.com/yohnnn/public-survey-platform/back/pkg/jwt"
 	"github.com/yohnnn/public-survey-platform/back/pkg/tx"
 	"github.com/yohnnn/public-survey-platform/back/services/user-service/internal/config"
 	handlergrpc "github.com/yohnnn/public-survey-platform/back/services/user-service/internal/handler/grpc"
@@ -34,6 +36,7 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	appmetrics.StartServerFromEnv(ctx, ":9102", logger)
 
 	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {
@@ -50,7 +53,7 @@ func main() {
 	txManager := tx.NewManager(pool)
 
 	hasher := security.NewBcryptHasher(cfg.BcryptCost)
-	tokenManager := security.NewJWTManager(cfg.JWTSecret, cfg.AccessTokenTTL, cfg.RefreshTokenTTL)
+	tokenManager := jwt.NewJWTManager(cfg.JWTSecret, cfg.AccessTokenTTL, cfg.RefreshTokenTTL)
 
 	userService := service.NewUserService(
 		userRepo,
@@ -66,6 +69,7 @@ func main() {
 
 	grpcServer := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
+			appmetrics.UnaryServerInterceptor("user-service"),
 			grpcinterceptor.UnaryLoggingInterceptor(serviceLogger.Slog()),
 			grpcinterceptor.UnaryAuthInterceptor(userService.ValidateToken, map[string]struct{}{
 				userv1.UserService_Register_FullMethodName:              {},

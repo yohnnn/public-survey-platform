@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 	"net"
 	"os"
@@ -14,14 +13,13 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/yohnnn/public-survey-platform/back/pkg/cache/redisstore"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
 	pollv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/poll/v1"
-	userv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/user/v1"
 	"github.com/yohnnn/public-survey-platform/back/pkg/events"
 	"github.com/yohnnn/public-survey-platform/back/pkg/grpcinterceptor"
 	applogger "github.com/yohnnn/public-survey-platform/back/pkg/logger"
+	appmetrics "github.com/yohnnn/public-survey-platform/back/pkg/metrics"
 	"github.com/yohnnn/public-survey-platform/back/pkg/outbox"
 	"github.com/yohnnn/public-survey-platform/back/pkg/tx"
 	"github.com/yohnnn/public-survey-platform/back/services/poll-service/internal/config"
@@ -44,19 +42,13 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	appmetrics.StartServerFromEnv(ctx, ":9103", logger)
 
 	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {
 		logger.Fatalf("connect to database: %v", err)
 	}
 	defer pool.Close()
-
-	authConn, err := grpc.NewClient(cfg.UserGRPCEndpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		logger.Fatalf("connect to user service: %v", err)
-	}
-	defer authConn.Close()
-	authClient := userv1.NewUserServiceClient(authConn)
 
 	pollRepo := postgres.NewPollRepository(pool)
 	tagRepo := postgres.NewTagRepository(pool)
@@ -152,17 +144,7 @@ func main() {
 		}
 	}()
 
-	authInterceptor := grpcinterceptor.UnaryAuthInterceptor(
-		func(ctx context.Context, token string) (string, error) {
-			resp, err := authClient.ValidateToken(ctx, &userv1.ValidateTokenRequest{AccessToken: token})
-			if err != nil {
-				return "", err
-			}
-			if !resp.GetValid() {
-				return "", fmt.Errorf("token is not valid")
-			}
-			return resp.GetUserId(), nil
-		},
+	authInterceptor := grpcinterceptor.UnaryUserIDInterceptor(
 		map[string]struct{}{
 			pollv1.PollService_ListPolls_FullMethodName: {},
 			pollv1.PollService_GetPoll_FullMethodName:   {},
@@ -172,7 +154,7 @@ func main() {
 	loggingInterceptor := grpcinterceptor.UnaryLoggingInterceptor(serviceLogger.Slog())
 
 	srv := grpc.NewServer(
-		grpc.ChainUnaryInterceptor(loggingInterceptor, authInterceptor),
+		grpc.ChainUnaryInterceptor(appmetrics.UnaryServerInterceptor("poll-service"), loggingInterceptor, authInterceptor),
 	)
 	pollv1.RegisterPollServiceServer(srv, grpcHandler.NewHandler(pollSvc))
 	reflection.Register(srv)

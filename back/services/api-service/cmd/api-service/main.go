@@ -17,6 +17,8 @@ import (
 	userv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/user/v1"
 	votev1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/vote/v1"
 	applogger "github.com/yohnnn/public-survey-platform/back/pkg/logger"
+	appmetrics "github.com/yohnnn/public-survey-platform/back/pkg/metrics"
+	"github.com/yohnnn/public-survey-platform/back/pkg/jwt"
 	"github.com/yohnnn/public-survey-platform/back/services/api-service/internal/config"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -32,21 +34,30 @@ func main() {
 		logger.Fatalf("load config: %v", err)
 	}
 
+	jwtValidator := jwt.NewJWTValidator(cfg.JWTSecret)
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	appmetrics.StartServerFromEnv(ctx, ":9101", logger)
 
 	mux := runtime.NewServeMux(
 		runtime.WithMetadata(func(_ context.Context, req *http.Request) metadata.MD {
 			md := metadata.MD{}
 
-			authorization := strings.TrimSpace(req.Header.Get("Authorization"))
-			if authorization != "" {
-				md.Set("authorization", authorization)
-			}
-
 			xRequestID := strings.TrimSpace(req.Header.Get("X-Request-Id"))
 			if xRequestID != "" {
 				md.Set("x-request-id", xRequestID)
+			}
+
+			authorization := strings.TrimSpace(req.Header.Get("Authorization"))
+			if authorization != "" {
+				md.Set("authorization", authorization)
+
+				if token := parseBearerToken(authorization); token != "" {
+					if userID, err := jwtValidator.ValidateAccessToken(token); err == nil && userID != "" {
+						md.Set("x-user-id", userID)
+					}
+				}
 			}
 
 			return md
@@ -80,6 +91,7 @@ func main() {
 	})
 	handler = corsMiddleware(newOriginPolicy(cfg.AllowedOrigins), handler)
 	handler = requestLoggingMiddleware(serviceLogger.Slog(), handler)
+	handler = appmetrics.HTTPMiddleware("api-service", handler)
 
 	httpServer := &http.Server{
 		Addr:              cfg.HTTPAddr,
@@ -173,6 +185,17 @@ func (p originPolicy) Allow(origin string) bool {
 	}
 	_, ok := p.allowed[origin]
 	return ok
+}
+
+func parseBearerToken(raw string) string {
+	parts := strings.SplitN(strings.TrimSpace(raw), " ", 2)
+	if len(parts) != 2 {
+		return ""
+	}
+	if !strings.EqualFold(parts[0], "Bearer") {
+		return ""
+	}
+	return strings.TrimSpace(parts[1])
 }
 
 func corsMiddleware(policy originPolicy, next http.Handler) http.Handler {

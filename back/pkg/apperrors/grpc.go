@@ -7,7 +7,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// GRPCRule describes how a domain error should be mapped to a gRPC status code.
 type GRPCRule struct {
 	Target  error
 	Code    codes.Code

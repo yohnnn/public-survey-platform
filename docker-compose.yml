@@ -133,6 +133,7 @@ services:
       dockerfile: services/user-service/Dockerfile
     environment:
       GRPC_ADDR: :50051
+      METRICS_ADDR: :9102
       DATABASE_URL: postgres://postgres:postgres@user-postgres:5432/auth_service?sslmode=disable
       JWT_SECRET: change-me-super-secret
       ACCESS_TOKEN_TTL: 15m
@@ -140,6 +141,7 @@ services:
       BCRYPT_COST: 12
     ports:
       - "50051:50051"
+      - "9102:9102"
     depends_on:
       user-postgres:
         condition: service_healthy
@@ -185,6 +187,7 @@ services:
       dockerfile: services/poll-service/Dockerfile
     environment:
       GRPC_ADDR: :50052
+      METRICS_ADDR: :9103
       DATABASE_URL: postgres://postgres:postgres@poll-postgres:5432/poll_service?sslmode=disable
       USER_GRPC_ENDPOINT: user-service:50051
       REDIS_ADDR: redis:6379
@@ -207,6 +210,7 @@ services:
       MINIO_MAX_FILE_BYTES: 10485760
     ports:
       - "50052:50052"
+      - "9103:9103"
     depends_on:
       poll-postgres:
         condition: service_healthy
@@ -258,6 +262,7 @@ services:
       dockerfile: services/vote-service/Dockerfile
     environment:
       GRPC_ADDR: :50053
+      METRICS_ADDR: :9104
       DATABASE_URL: postgres://postgres:postgres@vote-postgres:5432/vote_service?sslmode=disable
       USER_GRPC_ENDPOINT: user-service:50051
       POLL_GRPC_ENDPOINT: poll-service:50052
@@ -269,6 +274,7 @@ services:
       KAFKA_WRITE_TIMEOUT: 5s
     ports:
       - "50053:50053"
+      - "9104:9104"
     depends_on:
       vote-postgres:
         condition: service_healthy
@@ -320,6 +326,7 @@ services:
       dockerfile: services/feed-service/Dockerfile
     environment:
       GRPC_ADDR: :50054
+      METRICS_ADDR: :9105
       DATABASE_URL: postgres://postgres:postgres@feed-postgres:5432/feed_service?sslmode=disable
       USER_GRPC_ENDPOINT: user-service:50051
       REDIS_ADDR: redis:6379
@@ -330,6 +337,7 @@ services:
       KAFKA_GROUP_ID: feed-service
     ports:
       - "50054:50054"
+      - "9105:9105"
     depends_on:
       feed-postgres:
         condition: service_healthy
@@ -377,6 +385,7 @@ services:
       dockerfile: services/analytics-service/Dockerfile
     environment:
       GRPC_ADDR: :50055
+      METRICS_ADDR: :9106
       DATABASE_URL: postgres://postgres:postgres@analytics-postgres:5432/analytics_service?sslmode=disable
       REDIS_ADDR: redis:6379
       KAFKA_BROKERS: kafka:9092
@@ -386,6 +395,7 @@ services:
       KAFKA_GROUP_ID: analytics-service
     ports:
       - "50055:50055"
+      - "9106:9106"
     depends_on:
       analytics-postgres:
         condition: service_healthy
@@ -403,14 +413,17 @@ services:
     environment:
       HTTP_ADDR: :8080
       HTTP_PORT: 8080
+      METRICS_ADDR: :9101
       USER_GRPC_ENDPOINT: user-service:50051
       POLL_GRPC_ENDPOINT: poll-service:50052
       VOTE_GRPC_ENDPOINT: vote-service:50053
       FEED_GRPC_ENDPOINT: feed-service:50054
       ANALYTICS_GRPC_ENDPOINT: analytics-service:50055
+      JWT_SECRET: change-me-super-secret
       ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000,http://localhost:8082,http://127.0.0.1:8082
     ports:
       - "8080:8080"
+      - "9101:9101"
     depends_on:
       - user-service
       - poll-service
@@ -434,9 +447,50 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: psp-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.console.libraries=/usr/share/prometheus/console_libraries
+      - --web.console.templates=/usr/share/prometheus/consoles
+    volumes:
+      - ./back/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      - api-service
+      - user-service
+      - poll-service
+      - vote-service
+      - feed-service
+      - analytics-service
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: psp-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./back/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./back/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
 volumes:
   redis_data:
   minio_data:
+  prometheus_data:
+  grafana_data:
   auth_postgres_data:
   poll_postgres_data:
   vote_postgres_data:
