@@ -2,6 +2,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { useToast } from "../components/Toast";
+import { countries } from "../data/countries";
 
 export function AuthPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -24,7 +25,7 @@ export function AuthPage() {
       setTokens(response.tokens);
       await loadMe(true);
       toast(isRegister ? "Аккаунт создан." : "Вы вошли.");
-      navigate("/feed");
+      navigate("/");
     } catch (error) {
       toast(error instanceof Error ? error.message : "Не удалось выполнить вход.", "error");
     } finally {
@@ -66,7 +67,11 @@ export function AuthPage() {
               <div className="grid-two">
                 <label>
                   Страна
-                  <input name="country" placeholder="RU" required />
+                  <select name="country" required defaultValue="RU">
+                    {countries.map((c) => (
+                      <option key={c.code} value={c.code}>{c.name}</option>
+                    ))}
+                  </select>
                 </label>
                 <label>
                   Год рождения

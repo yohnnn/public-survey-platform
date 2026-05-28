@@ -76,6 +76,8 @@ func main() {
 	}
 
 	pollSvc := service.NewPollService(pollRepo, tagRepo, outboxRepo, *txMgr, clock, idGen, imageUploader)
+
+	invalidatePollCache := func(ctx context.Context, pollID string) {}
 	if cfg.RedisAddr != "" {
 		cacheStore := redisstore.New(redisstore.Config{
 			Addr:     cfg.RedisAddr,
@@ -93,6 +95,10 @@ func main() {
 				}
 			}()
 			pollSvc = pollcache.NewPollService(pollSvc, cacheStore, pollcache.DefaultConfig())
+			invalidatePollCache = func(ctx context.Context, pollID string) {
+				_ = cacheStore.Delete(ctx, "poll-service:poll:"+pollID)
+				_, _ = cacheStore.Increment(ctx, "poll-service:poll-list:version")
+			}
 		}
 	}
 
@@ -127,7 +133,7 @@ func main() {
 		logger.Fatalf("create kafka subscriber: %v", err)
 	}
 
-	voteConsumer := pollkafka.NewPollConsumer(subscriber, pollRepo, txMgr, logger)
+	voteConsumer := pollkafka.NewPollConsumer(subscriber, pollRepo, txMgr, logger, invalidatePollCache)
 
 	outboxDone := make(chan struct{})
 	go func() {

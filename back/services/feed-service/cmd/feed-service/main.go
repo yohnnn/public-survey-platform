@@ -60,6 +60,7 @@ func main() {
 	feedRepo := postgres.NewFeedRepository(pool)
 	txMgr := tx.NewManager(pool)
 	feedSvc := service.NewFeedService(feedRepo, userClient)
+	var flushFeedCache func(context.Context)
 	if cfg.RedisAddr != "" {
 		cacheStore := redisstore.New(redisstore.Config{
 			Addr:     cfg.RedisAddr,
@@ -76,7 +77,12 @@ func main() {
 					logger.Printf("close redis cache store error: %v", closeErr)
 				}
 			}()
-			feedSvc = feedcache.NewFeedService(feedSvc, cacheStore, feedcache.DefaultConfig())
+			feedSvc = feedcache.NewFeedService(feedSvc, userClient, cacheStore, feedcache.DefaultConfig())
+			flushFeedCache = func(ctx context.Context) {
+				if err := cacheStore.DeleteByPattern(ctx, "feed-service:*"); err != nil {
+					logger.Printf("flush feed cache error: %v", err)
+				}
+			}
 		}
 	}
 
@@ -91,7 +97,7 @@ func main() {
 		logger.Fatalf("create kafka subscriber: %v", err)
 	}
 
-	consumer := feedkafka.NewFeedConsumer(subscriber, feedRepo, txMgr, logger)
+	consumer := feedkafka.NewFeedConsumer(subscriber, feedRepo, txMgr, logger, flushFeedCache)
 	consumerDone := make(chan struct{})
 	go func() {
 		defer close(consumerDone)

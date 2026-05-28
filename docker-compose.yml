@@ -447,6 +447,20 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  frontend:
+    container_name: psp-frontend
+    build:
+      context: ./front
+    environment:
+      PORT: 3000
+      API_PROXY_TARGET: http://api-service:8080
+    ports:
+      - "3000:3000"
+    depends_on:
+      api-service:
+        condition: service_started
+    restart: unless-stopped
+
   prometheus:
     image: prom/prometheus:v2.55.1
     container_name: psp-prometheus

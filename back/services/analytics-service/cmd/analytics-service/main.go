@@ -50,6 +50,7 @@ func main() {
 
 	analyticsRepo := postgres.NewAnalyticsRepository(pool)
 	analyticsSvc := service.NewAnalyticsService(analyticsRepo)
+	var flushAnalyticsCache func(context.Context, string)
 	if cfg.RedisAddr != "" {
 		cacheStore := redisstore.New(redisstore.Config{
 			Addr:     cfg.RedisAddr,
@@ -67,6 +68,11 @@ func main() {
 				}
 			}()
 			analyticsSvc = analyticscache.NewAnalyticsService(analyticsSvc, cacheStore, analyticscache.DefaultConfig())
+			flushAnalyticsCache = func(ctx context.Context, pollID string) {
+				if err := cacheStore.DeleteByPattern(ctx, "analytics-service:*"); err != nil {
+					logger.Printf("flush analytics cache error: %v", err)
+				}
+			}
 		}
 	}
 	txMgr := tx.NewManager(pool)
@@ -82,7 +88,7 @@ func main() {
 		logger.Fatalf("create kafka subscriber: %v", err)
 	}
 
-	consumer := analyticskafka.NewAnalyticsConsumer(subscriber, analyticsRepo, txMgr, logger)
+	consumer := analyticskafka.NewAnalyticsConsumer(subscriber, analyticsRepo, txMgr, logger, flushAnalyticsCache)
 	consumerDone := make(chan struct{})
 	go func() {
 		defer close(consumerDone)

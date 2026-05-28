@@ -76,6 +76,30 @@ func (s *Store) Increment(ctx context.Context, key string) (int64, error) {
 	return s.client.Incr(ctx, key).Result()
 }
 
+func (s *Store) DeleteByPattern(ctx context.Context, pattern string) error {
+	if s == nil || s.client == nil {
+		return nil
+	}
+
+	var cursor uint64
+	for {
+		keys, nextCursor, err := s.client.Scan(ctx, cursor, pattern, 200).Result()
+		if err != nil {
+			return err
+		}
+		if len(keys) > 0 {
+			if delErr := s.client.Del(ctx, keys...).Err(); delErr != nil {
+				return delErr
+			}
+		}
+		cursor = nextCursor
+		if cursor == 0 {
+			break
+		}
+	}
+	return nil
+}
+
 func (s *Store) Close() error {
 	if s == nil || s.client == nil {
 		return nil

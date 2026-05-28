@@ -13,26 +13,48 @@ import (
 )
 
 type AnalyticsConsumer struct {
-	consumer *events.Consumer
-	repo     repository.AnalyticsRepository
-	tx       *tx.Manager
-	logger   *log.Logger
+	consumer     *events.Consumer
+	repo         repository.AnalyticsRepository
+	tx           *tx.Manager
+	logger       *log.Logger
+	afterProcess func(ctx context.Context, pollID string)
 }
 
-func NewAnalyticsConsumer(subscriber events.Subscriber, repo repository.AnalyticsRepository, txMgr *tx.Manager, logger *log.Logger) *AnalyticsConsumer {
+func NewAnalyticsConsumer(subscriber events.Subscriber, repo repository.AnalyticsRepository, txMgr *tx.Manager, logger *log.Logger, afterProcess func(ctx context.Context, pollID string)) *AnalyticsConsumer {
 	c := &AnalyticsConsumer{
-		repo:   repo,
-		tx:     txMgr,
-		logger: logger,
+		repo:         repo,
+		tx:           txMgr,
+		logger:       logger,
+		afterProcess: afterProcess,
+	}
+
+	wrap := func(handler events.HandlerFunc, extractPollID func(msg events.Message) string) events.HandlerFunc {
+		return func(ctx context.Context, msg events.Message) error {
+			err := handler(ctx, msg)
+			if err == nil && c.afterProcess != nil {
+				c.afterProcess(ctx, extractPollID(msg))
+			}
+			return err
+		}
 	}
 
 	handlers := map[string]events.HandlerFunc{
-		events.TopicVoteCast:    c.handleVoteCast,
-		events.TopicVoteRemoved: c.handleVoteRemoved,
+		events.TopicVoteCast:    wrap(c.handleVoteCast, func(msg events.Message) string { return extractPayloadPollID(msg) }),
+		events.TopicVoteRemoved: wrap(c.handleVoteRemoved, func(msg events.Message) string { return extractPayloadPollID(msg) }),
 	}
 
 	c.consumer = events.NewConsumer(subscriber, handlers)
 	return c
+}
+
+func extractPayloadPollID(msg events.Message) string {
+	var partial struct {
+		PollID string `json:"poll_id"`
+	}
+	if err := json.Unmarshal(msg.Payload, &partial); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(partial.PollID)
 }
 
 func (c *AnalyticsConsumer) Run(ctx context.Context) error {

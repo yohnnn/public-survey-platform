@@ -115,7 +115,7 @@ func (r *FeedRepository) DeleteFeedItem(ctx context.Context, feedItemID string) 
 func (r *FeedRepository) IncrementOptionVotes(ctx context.Context, optionID string, delta int64) (bool, error) {
 	const query = `
 		UPDATE feed_item_options
-		SET votes_count = votes_count + $1
+		SET votes_count = GREATEST(0, votes_count + $1)
 		WHERE id = $2
 	`
 

@@ -13,25 +13,37 @@ import (
 )
 
 type FeedConsumer struct {
-	consumer *events.Consumer
-	repo     repository.FeedRepository
-	tx       *tx.Manager
-	logger   *log.Logger
+	consumer     *events.Consumer
+	repo         repository.FeedRepository
+	tx           *tx.Manager
+	logger       *log.Logger
+	afterProcess func(ctx context.Context)
 }
 
-func NewFeedConsumer(subscriber events.Subscriber, repo repository.FeedRepository, txMgr *tx.Manager, logger *log.Logger) *FeedConsumer {
+func NewFeedConsumer(subscriber events.Subscriber, repo repository.FeedRepository, txMgr *tx.Manager, logger *log.Logger, afterProcess func(ctx context.Context)) *FeedConsumer {
 	c := &FeedConsumer{
-		repo:   repo,
-		tx:     txMgr,
-		logger: logger,
+		repo:         repo,
+		tx:           txMgr,
+		logger:       logger,
+		afterProcess: afterProcess,
+	}
+
+	wrap := func(handler events.HandlerFunc) events.HandlerFunc {
+		return func(ctx context.Context, msg events.Message) error {
+			err := handler(ctx, msg)
+			if err == nil && c.afterProcess != nil {
+				c.afterProcess(ctx)
+			}
+			return err
+		}
 	}
 
 	handlers := map[string]events.HandlerFunc{
-		events.TopicPollCreated: c.handlePollCreated,
-		events.TopicPollUpdated: c.handlePollUpdated,
-		events.TopicPollDeleted: c.handlePollDeleted,
-		events.TopicVoteCast:    c.handleVoteCast,
-		events.TopicVoteRemoved: c.handleVoteRemoved,
+		events.TopicPollCreated: wrap(c.handlePollCreated),
+		events.TopicPollUpdated: wrap(c.handlePollUpdated),
+		events.TopicPollDeleted: wrap(c.handlePollDeleted),
+		events.TopicVoteCast:    wrap(c.handleVoteCast),
+		events.TopicVoteRemoved: wrap(c.handleVoteRemoved),
 	}
 
 	c.consumer = events.NewConsumer(subscriber, handlers)

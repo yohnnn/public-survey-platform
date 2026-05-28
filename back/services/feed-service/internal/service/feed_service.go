@@ -7,7 +7,6 @@ import (
 	userv1 "github.com/yohnnn/public-survey-platform/back/api/gen/go/user/v1"
 	"github.com/yohnnn/public-survey-platform/back/services/feed-service/internal/models"
 	"github.com/yohnnn/public-survey-platform/back/services/feed-service/internal/repository"
-	"google.golang.org/grpc/metadata"
 )
 
 type feedService struct {
@@ -184,7 +183,7 @@ func (s *feedService) GetFollowingFeed(ctx context.Context, userID, cursor strin
 		listLimit = 100
 	}
 
-	followingIDs, err := s.listFollowingIDs(ctx)
+	followingIDs, err := ListFollowingIDs(ctx, s.userClient)
 	if err != nil {
 		return nil, "", false, err
 	}
@@ -230,37 +229,6 @@ func (s *feedService) GetFollowingFeed(ctx context.Context, userID, cursor strin
 	return enriched, nextCursor, hasMore, nil
 }
 
-func (s *feedService) listFollowingIDs(ctx context.Context) ([]string, error) {
-	outCtx := ctx
-	if inMD, ok := metadata.FromIncomingContext(ctx); ok {
-		authVals := inMD.Get("authorization")
-		if len(authVals) > 0 && strings.TrimSpace(authVals[0]) != "" {
-			outCtx = metadata.NewOutgoingContext(ctx, metadata.Pairs("authorization", authVals[0]))
-		}
-	}
-
-	resp, err := s.userClient.ListMyFollowing(outCtx, &userv1.ListMyFollowingRequest{})
-	if err != nil {
-		return nil, err
-	}
-
-	userIDs := resp.GetUserIds()
-	out := make([]string, 0, len(userIDs))
-	seen := make(map[string]struct{}, len(userIDs))
-	for _, userID := range userIDs {
-		userID = strings.TrimSpace(userID)
-		if userID == "" {
-			continue
-		}
-		if _, ok := seen[userID]; ok {
-			continue
-		}
-		seen[userID] = struct{}{}
-		out = append(out, userID)
-	}
-	return out, nil
-}
-
 func (s *feedService) enrichItems(ctx context.Context, items []models.FeedItem) ([]models.FeedItem, error) {
 	if len(items) == 0 {
 		return items, nil
@@ -282,23 +250,53 @@ func (s *feedService) enrichItems(ctx context.Context, items []models.FeedItem) 
 		creatorIDs = append(creatorIDs, creatorID)
 	}
 
-	optionsMap, err := s.feedRepo.GetOptionsByFeedItemIDs(ctx, ids)
-	if err != nil {
-		return nil, err
+	type optResult struct {
+		data map[string][]models.FeedItemOption
+		err  error
 	}
-	tagsMap, err := s.feedRepo.GetTagsByFeedItemIDs(ctx, ids)
-	if err != nil {
-		return nil, err
+	type tagResult struct {
+		data map[string][]string
+		err  error
 	}
-	authorsMap, err := s.getAuthorsByIDs(ctx, creatorIDs)
-	if err != nil {
-		return nil, err
+	type authResult struct {
+		data map[string]models.FeedAuthor
+		err  error
+	}
+
+	optCh := make(chan optResult, 1)
+	tagCh := make(chan tagResult, 1)
+	authCh := make(chan authResult, 1)
+
+	go func() {
+		m, err := s.feedRepo.GetOptionsByFeedItemIDs(ctx, ids)
+		optCh <- optResult{m, err}
+	}()
+	go func() {
+		m, err := s.feedRepo.GetTagsByFeedItemIDs(ctx, ids)
+		tagCh <- tagResult{m, err}
+	}()
+	go func() {
+		m, err := s.getAuthorsByIDs(ctx, creatorIDs)
+		authCh <- authResult{m, err}
+	}()
+
+	opt := <-optCh
+	if opt.err != nil {
+		return nil, opt.err
+	}
+	tag := <-tagCh
+	if tag.err != nil {
+		return nil, tag.err
+	}
+	auth := <-authCh
+	if auth.err != nil {
+		return nil, auth.err
 	}
 
 	for i := range items {
-		items[i].Options = optionsMap[items[i].ID]
-		items[i].Tags = tagsMap[items[i].ID]
-		if author, ok := authorsMap[items[i].CreatorID]; ok {
+		items[i].Options = opt.data[items[i].ID]
+		items[i].Tags = tag.data[items[i].ID]
+		if author, ok := auth.data[items[i].CreatorID]; ok {
 			items[i].Author = author
 		} else {
 			items[i].Author = models.FeedAuthor{ID: items[i].CreatorID}

@@ -1,18 +1,22 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { ErrorState } from "../components/ErrorState";
 import { LoadingState } from "../components/LoadingState";
-import { ResultRow } from "../components/PollCard";
+import { PollAnalyticsCharts } from "../components/PollAnalyticsCharts";
 import { useToast } from "../components/Toast";
+import { pollToLive, useLiveUpdates } from "../data/liveUpdates";
+import { tagLabel } from "../data/tags";
 import type { AgeStat, CountryStat, GenderStat, Poll, PollAnalytics, PublicUserProfile, VoteState } from "../types/domain";
-import { formatDate, splitCSV, toCount } from "../utils/format";
+import { detectAgeRange, formatDate, toCount } from "../utils/format";
 
 export function PollPage() {
   const { id = "" } = useParams();
   const { api, me, isAuthenticated } = useAuth();
+  const { mergePoll, setPollLive } = useLiveUpdates();
   const toast = useToast();
-  const navigate = useNavigate();
+  const [analyticsKey, setAnalyticsKey] = useState(0);
+  const [voteBusy, setVoteBusy] = useState(false);
   const [state, setState] = useState<{
     poll?: Poll;
     author?: PublicUserProfile;
@@ -23,8 +27,7 @@ export function PollPage() {
     age: AgeStat[];
     loading: boolean;
     error: string;
-    tab: "results" | "analytics";
-  }>({ countries: [], gender: [], age: [], loading: true, error: "", tab: "results" });
+  }>({ countries: [], gender: [], age: [], loading: true, error: "" });
 
   useEffect(() => {
     let active = true;
@@ -33,27 +36,19 @@ export function PollPage() {
       try {
         const pollResponse = await api.poll(id);
         const poll = pollResponse.poll;
-        const [author, analytics, countries, gender, age, vote] = await Promise.allSettled([
+        const [author, vote] = await Promise.allSettled([
           api.profile(poll.creatorId, isAuthenticated),
-          api.analytics(poll.id),
-          api.analyticsSection<CountryStat>(poll.id, "countries"),
-          api.analyticsSection<GenderStat>(poll.id, "gender"),
-          api.analyticsSection<AgeStat>(poll.id, "age"),
           isAuthenticated ? api.userVote(poll.id) : Promise.resolve({ hasVoted: false, optionIds: [], pollId: poll.id }),
         ]);
         if (!active) return;
-        setState({
-          poll,
+        setState((current) => ({
+          ...current,
+          poll: mergePoll(poll),
           author: settled(author)?.profile,
-          analytics: settled(analytics),
-          countries: settled(countries)?.items || [],
-          gender: settled(gender)?.items || [],
-          age: settled(age)?.items || [],
           vote: settled(vote),
           loading: false,
           error: "",
-          tab: "results",
-        });
+        }));
       } catch (error) {
         if (!active) return;
         setState((current) => ({ ...current, loading: false, error: error instanceof Error ? error.message : "Не удалось загрузить опрос." }));
@@ -63,13 +58,87 @@ export function PollPage() {
     return () => {
       active = false;
     };
-  }, [api, id, isAuthenticated]);
+  }, [api, id, isAuthenticated, mergePoll]);
+
+  const loadAnalytics = useCallback(async () => {
+    if (!id) return;
+    try {
+      const [analytics, countries, gender, age] = await Promise.allSettled([
+        api.analytics(id),
+        api.analyticsSection<CountryStat>(id, "countries"),
+        api.analyticsSection<GenderStat>(id, "gender"),
+        api.analyticsSection<AgeStat>(id, "age"),
+      ]);
+      setState((current) => ({
+        ...current,
+        analytics: settled(analytics),
+        countries: settled(countries)?.items || [],
+        gender: settled(gender)?.items || [],
+        age: settled(age)?.items || [],
+      }));
+    } catch {
+      // analytics load failed silently — results still work
+    }
+  }, [api, id]);
+
+  useEffect(() => {
+    void loadAnalytics();
+  }, [loadAnalytics, analyticsKey]);
 
   const poll = state.poll;
   const selected = useMemo(() => new Set(state.vote?.optionIds || []), [state.vote]);
 
-  async function reloadPoll() {
-    navigate(0);
+  function applyDemographicDelta(delta: number) {
+    if (!delta || !me) return {};
+    const countries = adjustStat(state.countries, "country", me.country, delta, (country) => ({ country, votes: delta }));
+    const gender = adjustStat(state.gender, "gender", me.gender, delta, (gender) => ({ gender, votes: delta }));
+    const ageRange = detectAgeRange(me.birthYear);
+    const age = ageRange
+      ? adjustStat(state.age, "ageRange", ageRange, delta, (ageRange) => ({ ageRange, votes: delta }))
+      : state.age;
+    return { countries, gender, age };
+  }
+
+  function applyVoteOptimistic(optionIds: string[]) {
+    if (!poll) return;
+    const prevVote = state.vote;
+    const prevOptions = poll.options;
+
+    const oldIds = new Set(prevVote?.optionIds || []);
+    const newIds = new Set(optionIds);
+
+    const nextOptions = prevOptions.map((opt) => {
+      let delta = 0;
+      if (oldIds.has(opt.id) && !newIds.has(opt.id)) delta = -1;
+      if (!oldIds.has(opt.id) && newIds.has(opt.id)) delta = 1;
+      return delta ? { ...opt, votesCount: Number(opt.votesCount || 0) + delta } : opt;
+    });
+
+    const voteDelta = prevVote?.hasVoted ? 0 : 1;
+    const nextTotalVotes = Number(poll.totalVotes || 0) + voteDelta;
+    const demographicDelta = voteDelta ? applyDemographicDelta(1) : {};
+
+    setState((current) => ({
+      ...current,
+      poll: { ...poll, options: nextOptions, totalVotes: nextTotalVotes },
+      vote: { pollId: poll.id, hasVoted: true, optionIds },
+      ...demographicDelta,
+    }));
+    setPollLive(poll.id, pollToLive({ options: nextOptions, totalVotes: nextTotalVotes }));
+  }
+
+  function revertVoteOptimistic(
+    prevPoll: Poll,
+    prevVote?: VoteState,
+    prevAnalytics?: Pick<typeof state, "countries" | "gender" | "age">,
+  ) {
+    setState((current) => ({
+      ...current,
+      poll: prevPoll,
+      vote: prevVote,
+      ...(prevAnalytics || {}),
+    }));
+    setPollLive(prevPoll.id, pollToLive(prevPoll));
   }
 
   async function submitVote(event: FormEvent<HTMLFormElement>) {
@@ -80,73 +149,88 @@ export function PollPage() {
       toast("Выберите вариант.", "error");
       return;
     }
+
+    const prevPoll = { ...poll, options: poll.options.map((o) => ({ ...o })) };
+    const prevVote = state.vote ? { ...state.vote, optionIds: [...state.vote.optionIds] } : undefined;
+    const prevAnalytics = { countries: [...state.countries], gender: [...state.gender], age: [...state.age] };
+
+    applyVoteOptimistic(optionIds);
+    setVoteBusy(true);
     try {
       await api.vote(poll.id, optionIds);
       toast("Голос сохранён.");
-      reloadPoll();
+      scheduleAnalyticsRefresh();
     } catch (error) {
+      revertVoteOptimistic(prevPoll, prevVote, prevAnalytics);
       toast(error instanceof Error ? error.message : "Не удалось сохранить голос.", "error");
+    } finally {
+      setVoteBusy(false);
     }
   }
 
   async function removeVote() {
-    if (!poll) return;
+    if (!poll || voteBusy) return;
+
+    const prevPoll = { ...poll, options: poll.options.map((o) => ({ ...o })) };
+    const prevVote = state.vote ? { ...state.vote, optionIds: [...state.vote.optionIds] } : undefined;
+    const prevAnalytics = { countries: [...state.countries], gender: [...state.gender], age: [...state.age] };
+
+    const removedIds = new Set(state.vote?.optionIds || []);
+    const nextOptions = poll.options.map((opt) =>
+      removedIds.has(opt.id) ? { ...opt, votesCount: Math.max(0, Number(opt.votesCount || 0) - 1) } : opt,
+    );
+    const nextTotalVotes = Math.max(0, Number(poll.totalVotes || 0) - 1);
+
+    setState((current) => ({
+      ...current,
+      poll: { ...poll, options: nextOptions, totalVotes: nextTotalVotes },
+      vote: { pollId: poll.id, hasVoted: false, optionIds: [] },
+      ...applyDemographicDelta(-1),
+    }));
+    setPollLive(poll.id, pollToLive({ options: nextOptions, totalVotes: nextTotalVotes }));
+
+    setVoteBusy(true);
     try {
       await api.removeVote(poll.id);
       toast("Голос удалён.");
-      reloadPoll();
+      scheduleAnalyticsRefresh();
     } catch (error) {
+      revertVoteOptimistic(prevPoll, prevVote, prevAnalytics);
       toast(error instanceof Error ? error.message : "Не удалось удалить голос.", "error");
+    } finally {
+      setVoteBusy(false);
     }
   }
 
-  async function updatePoll(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!poll) return;
-    const form = new FormData(event.currentTarget);
-    try {
-      const file = form.get("image") instanceof File && (form.get("image") as File).size > 0 ? (form.get("image") as File) : null;
-      const imageUrl = file ? await api.uploadImage(file) : undefined;
-      await api.updatePoll(poll.id, {
-        question: String(form.get("question") || "").trim(),
-        tags: splitCSV(String(form.get("tags") || "")),
-        ...(imageUrl ? { imageUrl } : {}),
-      });
-      toast("Опрос обновлён.");
-      reloadPoll();
-    } catch (error) {
-      toast(error instanceof Error ? error.message : "Не удалось обновить опрос.", "error");
-    }
-  }
-
-  async function deletePoll() {
-    if (!poll || !window.confirm("Удалить опрос без восстановления?")) return;
-    try {
-      await api.deletePoll(poll.id);
-      toast("Опрос удалён.");
-      navigate("/me");
-    } catch (error) {
-      toast(error instanceof Error ? error.message : "Не удалось удалить опрос.", "error");
-    }
+  function scheduleAnalyticsRefresh() {
+    window.setTimeout(() => setAnalyticsKey((k) => k + 1), 2500);
   }
 
   if (state.loading) return <LoadingState title="Опрос" />;
-  if (state.error || !poll) return <ErrorState message={state.error} onRetry={reloadPoll} />;
+  if (state.error || !poll) return <ErrorState message={state.error} onRetry={() => window.location.reload()} />;
 
   const isOwner = me?.id === poll.creatorId;
   const isMultiple = poll.type === "POLL_TYPE_MULTIPLE_CHOICE";
   const inputType = isMultiple ? "checkbox" : "radio";
 
   return (
-    <div className="page-view stack">
+    <div className="page-view stack poll-page">
       <section className="page-head">
         <div>
           <h1>{poll.question}</h1>
-          <p>
-            Автор: <Link to={`/profile/${encodeURIComponent(poll.creatorId)}`}>{state.author?.nickname || poll.creatorId}</Link>
+          <p className="muted small">
+            <Link to={`/profile/${encodeURIComponent(poll.creatorId)}`}>{state.author?.nickname || poll.creatorId}</Link>
+            {" · "}
+            {formatDate(poll.createdAt)}
           </p>
         </div>
-        <span className="chip">{formatDate(poll.createdAt)}</span>
+        <div className="actions">
+          {isOwner ? (
+            <Link className="button secondary" to={`/poll/${encodeURIComponent(poll.id)}/edit`}>
+              Редактировать
+            </Link>
+          ) : null}
+        </div>
       </section>
 
       <div className="split">
@@ -154,32 +238,28 @@ export function PollPage() {
           {poll.imageUrl ? <img className="poll-image" src={poll.imageUrl} alt="" /> : null}
           <div className="tag-list">
             {(poll.tags || []).map((tag) => (
-              <Link key={tag} className="tag" to={`/feed?tags=${encodeURIComponent(tag)}`}>
-                {tag}
+              <Link key={tag} className="tag" to={`/?tags=${encodeURIComponent(tag)}`}>
+                {tagLabel(tag)}
               </Link>
             ))}
           </div>
-          <div className="metric-row">
-            <div className="metric"><strong>{toCount(poll.totalVotes)}</strong><span>голосов</span></div>
-            <div className="metric"><strong>{poll.options?.length || 0}</strong><span>вариантов</span></div>
-            <div className="metric"><strong>{isMultiple ? "multi" : "single"}</strong><span>тип</span></div>
-          </div>
 
           {isAuthenticated ? (
-            <form className="stack" onSubmit={submitVote}>
-              <h3>{state.vote?.hasVoted ? "Ваш голос" : "Ваш выбор"}</h3>
+            <form className="stack" key={state.vote?.optionIds.join(",") || "no-vote"} onSubmit={submitVote}>
               <div className="option-list">
                 {(poll.options || []).map((option) => (
                   <label className="vote-option" key={option.id}>
-                    <input type={inputType} name="optionId" value={option.id} defaultChecked={selected.has(option.id)} />
+                    <input type={inputType} name="optionId" value={option.id} defaultChecked={selected.has(option.id)} disabled={voteBusy} />
                     <span>{option.text}</span>
                     <strong>{toCount(option.votesCount)}</strong>
                   </label>
                 ))}
               </div>
               <div className="actions">
-                <button type="submit">{state.vote?.hasVoted ? "Изменить голос" : "Проголосовать"}</button>
-                <button className="secondary" type="button" disabled={!state.vote?.hasVoted} onClick={removeVote}>
+                <button type="submit" disabled={voteBusy}>
+                  {voteBusy ? "Сохранение..." : state.vote?.hasVoted ? "Изменить голос" : "Проголосовать"}
+                </button>
+                <button className="secondary" type="button" disabled={!state.vote?.hasVoted || voteBusy} onClick={removeVote}>
                   Убрать голос
                 </button>
               </div>
@@ -187,69 +267,39 @@ export function PollPage() {
           ) : (
             <div className="empty">Войдите, чтобы проголосовать. <Link to="/auth">Авторизация</Link></div>
           )}
-
-          {isOwner ? (
-            <section className="card nested-card stack">
-              <h3>Управление опросом</h3>
-              <form className="stack" onSubmit={updatePoll}>
-                <label>Вопрос<textarea name="question" required defaultValue={poll.question} /></label>
-                <label>Теги<input name="tags" defaultValue={(poll.tags || []).join(", ")} /></label>
-                <label>Заменить изображение<input name="image" type="file" accept="image/*" /></label>
-                <div className="actions">
-                  <button type="submit">Сохранить</button>
-                  <button className="danger" type="button" onClick={deletePoll}>Удалить</button>
-                </div>
-              </form>
-            </section>
-          ) : null}
         </section>
 
-        <aside className="card stack">
-          <div className="tabbar compact-tabs">
-            <button className={state.tab === "results" ? "active" : ""} type="button" onClick={() => setState((current) => ({ ...current, tab: "results" }))}>Результаты</button>
-            <button className={state.tab === "analytics" ? "active" : ""} type="button" onClick={() => setState((current) => ({ ...current, tab: "analytics" }))}>Аналитика</button>
-          </div>
-          {state.tab === "results" ? (
-            <section>
-              <h3>Результаты</h3>
-              <div className="option-list">{(poll.options || []).map((option) => <ResultRow key={option.id} label={option.text} votes={option.votesCount} totalVotes={poll.totalVotes} />)}</div>
-            </section>
-          ) : (
-            <AnalyticsPanel poll={poll} analytics={state.analytics} countries={state.countries} gender={state.gender} age={state.age} />
-          )}
+        <aside className="poll-side stack">
+          <section className="card stack">
+            <h3>Аналитика</h3>
+            <PollAnalyticsCharts poll={poll} analytics={state.analytics} countries={state.countries} gender={state.gender} age={state.age} />
+          </section>
         </aside>
       </div>
     </div>
   );
 }
 
-function AnalyticsPanel({ poll, analytics, countries, gender, age }: { poll: Poll; analytics?: PollAnalytics; countries: CountryStat[]; gender: GenderStat[]; age: AgeStat[] }) {
-  const optionNames = new Map((poll.options || []).map((option) => [option.id, option.text]));
-  return (
-    <section className="stack">
-      <h3>Аналитика</h3>
-      <div className="stats-list">
-        <div className="stats-item"><span>Всего</span><strong>{toCount(analytics?.totalVotes)}</strong></div>
-        {(analytics?.options || []).map((item) => (
-          <div className="stats-item" key={item.optionId}><span>{optionNames.get(item.optionId) || item.optionId}</span><strong>{toCount(item.votes)}</strong></div>
-        ))}
-      </div>
-      <Stats title="Страны" items={countries} label={(item) => item.country} />
-      <Stats title="Пол" items={gender} label={(item) => item.gender} />
-      <Stats title="Возраст" items={age} label={(item) => item.ageRange} />
-    </section>
-  );
-}
-
-function Stats<T extends { votes: number }>({ title, items, label }: { title: string; items: T[]; label: (item: T) => string }) {
-  return (
-    <>
-      <h4>{title}</h4>
-      {items.length ? <div className="stats-list">{items.map((item) => <div className="stats-item" key={label(item) || String(item.votes)}><span>{label(item) || "-"}</span><strong>{toCount(item.votes)}</strong></div>)}</div> : <div className="empty">Данных пока нет.</div>}
-    </>
-  );
-}
-
 function settled<T>(result: PromiseSettledResult<T>): T | undefined {
   return result.status === "fulfilled" ? result.value : undefined;
+}
+
+function adjustStat<T extends { votes: number }>(
+  items: T[],
+  key: keyof T,
+  value: string,
+  delta: number,
+  create: (value: string) => T,
+): T[] {
+  const normalized = value.trim();
+  if (!normalized || !delta) return items;
+
+  const next = items.map((item) => ({ ...item }));
+  const index = next.findIndex((item) => String(item[key]) === normalized);
+  if (index >= 0) {
+    next[index] = { ...next[index], votes: Math.max(0, next[index].votes + delta) };
+    return next.filter((item) => item.votes > 0);
+  }
+  if (delta > 0) next.push(create(normalized));
+  return next;
 }

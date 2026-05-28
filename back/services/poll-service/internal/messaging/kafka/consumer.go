@@ -12,17 +12,19 @@ import (
 )
 
 type PollConsumer struct {
-	consumer *events.Consumer
-	repo     repository.PollRepository
-	tx       *tx.Manager
-	logger   *log.Logger
+	consumer        *events.Consumer
+	repo            repository.PollRepository
+	tx              *tx.Manager
+	logger          *log.Logger
+	invalidateCache func(ctx context.Context, pollID string)
 }
 
-func NewPollConsumer(subscriber events.Subscriber, repo repository.PollRepository, txMgr *tx.Manager, logger *log.Logger) *PollConsumer {
+func NewPollConsumer(subscriber events.Subscriber, repo repository.PollRepository, txMgr *tx.Manager, logger *log.Logger, invalidateCache func(ctx context.Context, pollID string)) *PollConsumer {
 	c := &PollConsumer{
-		repo:   repo,
-		tx:     txMgr,
-		logger: logger,
+		repo:            repo,
+		tx:              txMgr,
+		logger:          logger,
+		invalidateCache: invalidateCache,
 	}
 
 	handlers := map[string]events.HandlerFunc{
@@ -67,8 +69,14 @@ func (c *PollConsumer) handleVoteCast(ctx context.Context, msg events.Message) e
 				return err
 			}
 		}
-		return c.repo.UpdateTotalVotes(txCtx, pollID, delta)
-	})
+		if err := c.repo.UpdateTotalVotes(txCtx, pollID, delta); err != nil {
+				return err
+			}
+			if c.invalidateCache != nil {
+				c.invalidateCache(txCtx, pollID)
+			}
+			return nil
+		})
 }
 
 func (c *PollConsumer) handleVoteRemoved(ctx context.Context, msg events.Message) error {
@@ -100,8 +108,14 @@ func (c *PollConsumer) handleVoteRemoved(ctx context.Context, msg events.Message
 				return err
 			}
 		}
-		return c.repo.UpdateTotalVotes(txCtx, pollID, -delta)
-	})
+		if err := c.repo.UpdateTotalVotes(txCtx, pollID, -delta); err != nil {
+				return err
+			}
+			if c.invalidateCache != nil {
+				c.invalidateCache(txCtx, pollID)
+			}
+			return nil
+		})
 }
 
 func normalizeOptionIDs(optionIDs []string) []string {

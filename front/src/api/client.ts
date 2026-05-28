@@ -4,7 +4,6 @@ import type {
   Poll,
   PollAnalytics,
   PublicUserProfile,
-  Tag,
   User,
   VoteState,
 } from "../types/domain";
@@ -68,6 +67,10 @@ export class ApiClient {
     return this.request<FeedResponse>(`${path}?${search}`, { auth });
   }
 
+  userPolls(userId: string, search: string) {
+    return this.request<FeedResponse>(`/v1/feed/user/${encodeURIComponent(userId)}?${search}`);
+  }
+
   poll(id: string) {
     return this.request<{ poll: Poll }>(`/v1/polls/${encodeURIComponent(id)}`);
   }
@@ -102,14 +105,6 @@ export class ApiClient {
 
   analyticsSection<T>(pollId: string, section: "countries" | "gender" | "age") {
     return this.request<{ items: T[] }>(`/v1/polls/${encodeURIComponent(pollId)}/analytics/${section}`);
-  }
-
-  tags() {
-    return this.request<{ items: Tag[] }>("/v1/tags");
-  }
-
-  createTag(name: string) {
-    return this.request<{ tag: Tag }>("/v1/tags", { method: "POST", auth: true, body: { name } });
   }
 
   uploadUrl(file: File) {

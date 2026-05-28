@@ -1,139 +1,165 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import { FeedFilters } from "../components/FeedFilters";
 import { ErrorState } from "../components/ErrorState";
 import { LoadingState } from "../components/LoadingState";
 import { PollList } from "../components/PollCard";
-import { useToast } from "../components/Toast";
+import { feedModeByPath } from "../config/feed";
+import { useLiveUpdates } from "../data/liveUpdates";
 import type { FeedItem, PageMeta } from "../types/domain";
 import { buildListSearch } from "../utils/format";
 
-const feedConfig: Record<string, { title: string; subtitle: string; path: string; tags?: boolean; auth?: boolean }> = {
-  "/feed": { title: "Лента", subtitle: "Новые публичные опросы", path: "/v1/feed", tags: true },
-  "/trending": { title: "Тренды", subtitle: "Опросы с активным голосованием", path: "/v1/feed/trending" },
-  "/following": { title: "Подписки", subtitle: "Опросы авторов, на которых вы подписаны", path: "/v1/feed/following", auth: true },
+const FEED_LIMIT = "30";
+
+const modeCopy: Record<string, { lead: string }> = {
+  "/": { lead: "Свежие опросы от всего сообщества" },
+  "/trending": { lead: "Самые обсуждаемые опросы прямо сейчас" },
+  "/following": { lead: "Публикации авторов, на которых вы подписаны" },
 };
 
 export function FeedPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const toast = useToast();
   const { api, isAuthenticated } = useAuth();
-  const [params] = useSearchParams();
-  const config = feedConfig[location.pathname] || feedConfig["/feed"];
+  const { mergeFeedItem, reconcilePolls } = useLiveUpdates();
+  const [params, setSearchParams] = useSearchParams();
   const [items, setItems] = useState<FeedItem[]>([]);
   const [page, setPage] = useState<PageMeta | undefined>();
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [error, setError] = useState("");
-  const search = useMemo(() => buildListSearch({ limit: params.get("limit") || "20", tags: params.get("tags") || "", includeTags: config.tags }), [config.tags, params]);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  const mode = feedModeByPath(location.pathname);
+  const activeTags = useMemo(
+    () => (mode.tags ? params.getAll("tags").filter(Boolean) : []),
+    [mode.tags, params],
+  );
+  const copy = modeCopy[mode.path] || modeCopy["/"];
+
+  const initialSearch = useMemo(
+    () => buildListSearch({ limit: FEED_LIMIT, tags: activeTags, includeTags: mode.tags }),
+    [activeTags, mode.tags],
+  );
+
+  const loadFeed = useCallback(
+    async (search: string, append = false) => {
+      if (append) setLoadingMore(true);
+      else setStatus("loading");
+
+      try {
+        const response = await api.feed(mode.apiPath, search, mode.auth);
+        const fetched = response.items || [];
+        reconcilePolls(fetched);
+        setItems((current) => (append ? [...current, ...fetched.map(mergeFeedItem)] : fetched.map(mergeFeedItem)));
+        setPage(response.page);
+        setError("");
+        setStatus("ready");
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Не удалось загрузить ленту.";
+        if (append) setError(message);
+        else {
+          setError(message);
+          setStatus("error");
+        }
+      } finally {
+        setLoadingMore(false);
+      }
+    },
+    [api, mergeFeedItem, mode.apiPath, mode.auth, reconcilePolls],
+  );
 
   useEffect(() => {
-    let active = true;
-    setStatus("loading");
-    api
-      .feed(config.path, search, config.auth)
-      .then((response) => {
-        if (!active) return;
-        setItems(response.items || []);
-        setPage(response.page);
-        setStatus("ready");
-      })
-      .catch((err: unknown) => {
-        if (!active) return;
-        setError(err instanceof Error ? err.message : "Не удалось загрузить ленту.");
-        setStatus("error");
-      });
-    return () => {
-      active = false;
-    };
-  }, [api, config.auth, config.path, search]);
+    setFiltersOpen(false);
+    void loadFeed(initialSearch);
+  }, [initialSearch, loadFeed, location.pathname]);
 
-  if (config.auth && !isAuthenticated) {
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel || status !== "ready") return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting || loadingMore || !page?.hasMore || !page.nextCursor) return;
+        const moreSearch = buildListSearch({
+          cursor: page.nextCursor,
+          limit: FEED_LIMIT,
+          tags: activeTags,
+          includeTags: mode.tags,
+        });
+        void loadFeed(moreSearch, true);
+      },
+      { rootMargin: "240px" },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [activeTags, loadFeed, loadingMore, mode.tags, page, status]);
+
+  function toggleTag(tagId: string) {
+    const next = new URLSearchParams(params);
+    const current = next.getAll("tags");
+    next.delete("tags");
+    if (current.includes(tagId)) {
+      current.filter((tag) => tag !== tagId).forEach((tag) => next.append("tags", tag));
+    } else {
+      [...current, tagId].forEach((tag) => next.append("tags", tag));
+    }
+    setSearchParams(next);
+  }
+
+  function removeTag(tagId: string) {
+    const next = new URLSearchParams(params);
+    const current = next.getAll("tags").filter((tag) => tag !== tagId);
+    next.delete("tags");
+    current.forEach((tag) => next.append("tags", tag));
+    setSearchParams(next);
+  }
+
+  function clearTags() {
+    setSearchParams({});
+  }
+
+  if (mode.auth && !isAuthenticated) {
     return (
-      <section className="page-head">
-        <div>
-          <h1>Нужен вход</h1>
-          <p>Авторизуйтесь, чтобы пользоваться этим разделом.</p>
-        </div>
+      <div className="feed-empty-state">
+        <h1>Подписки</h1>
+        <p>Войдите, чтобы видеть опросы авторов, на которых вы подписаны.</p>
         <Link className="button" to="/auth">
           Войти
         </Link>
-      </section>
+      </div>
     );
   }
 
-  async function loadMore() {
-    if (!page?.nextCursor) return;
-    try {
-      const moreSearch = buildListSearch({
-        cursor: page.nextCursor,
-        limit: String(page.limit || params.get("limit") || "20"),
-        tags: params.get("tags") || "",
-        includeTags: config.tags,
-      });
-      const response = await api.feed(config.path, moreSearch, config.auth);
-      setItems((current) => [...current, ...(response.items || [])]);
-      setPage(response.page);
-    } catch (err) {
-      toast(err instanceof Error ? err.message : "Не удалось загрузить данные.", "error");
-    }
-  }
-
-  function submitFilters(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const next = new URLSearchParams();
-    const tags = String(form.get("tags") || "").trim();
-    const limit = String(form.get("limit") || "20");
-    if (tags) next.set("tags", tags);
-    if (limit) next.set("limit", limit);
-    navigate({ pathname: "/feed", search: next.toString() });
-  }
-
-  if (status === "loading") return <LoadingState title={config.title} />;
-  if (status === "error") return <ErrorState message={error} onRetry={() => navigate(0)} />;
+  if (status === "loading" && items.length === 0) return <LoadingState title={mode.label} />;
+  if (status === "error" && items.length === 0) return <ErrorState message={error} onRetry={() => navigate(0)} />;
 
   return (
-    <div className="page-view stack">
-      <section className="page-head">
+    <div className="feed-view">
+      <header className="feed-header">
         <div>
-          <h1>{config.title}</h1>
-          <p>{config.subtitle}</p>
+          <h1>{mode.label}</h1>
+          <p className="feed-lead">{copy.lead}</p>
         </div>
-        <Link className="button" to={isAuthenticated ? "/create" : "/auth"}>
-          {isAuthenticated ? "Создать опрос" : "Войти"}
-        </Link>
-      </section>
-      {config.tags ? (
-        <section className="card">
-          <form className="toolbar" onSubmit={submitFilters}>
-            <label>
-              Теги
-              <input name="tags" defaultValue={params.get("tags") || ""} placeholder="например: sport, news" />
-            </label>
-            <label>
-              Показать
-              <select name="limit" defaultValue={params.get("limit") || "20"}>
-                <option value="10">10</option>
-                <option value="20">20</option>
-                <option value="50">50</option>
-              </select>
-            </label>
-            <button type="submit">Фильтровать</button>
-            <Link className="button secondary" to="/feed">
-              Сбросить
-            </Link>
-          </form>
-        </section>
+      </header>
+
+      {mode.tags ? (
+        <FeedFilters
+          activeTags={activeTags}
+          open={filtersOpen}
+          onToggle={() => setFiltersOpen((value) => !value)}
+          onSelect={toggleTag}
+          onRemove={removeTag}
+          onClear={clearTags}
+        />
       ) : null}
+
       <PollList items={items} />
-      {page?.hasMore && page.nextCursor ? (
-        <div className="actions centered">
-          <button className="secondary" type="button" onClick={loadMore}>
-            Показать ещё
-          </button>
-        </div>
-      ) : null}
+      <div ref={sentinelRef} className="feed-sentinel" aria-hidden="true" />
+      {loadingMore ? <p className="feed-loading-more">Загружаем ещё...</p> : null}
     </div>
   );
 }

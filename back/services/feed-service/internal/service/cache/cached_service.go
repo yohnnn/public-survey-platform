@@ -22,12 +22,13 @@ func DefaultConfig() Config {
 }
 
 type feedService struct {
-	next  service.FeedService
-	store cachepkg.Store
-	ttl   time.Duration
+	next       service.FeedService
+	userClient service.FollowingReader
+	store      cachepkg.Store
+	ttl        time.Duration
 }
 
-func NewFeedService(next service.FeedService, store cachepkg.Store, cfg Config) service.FeedService {
+func NewFeedService(next service.FeedService, userClient service.FollowingReader, store cachepkg.Store, cfg Config) service.FeedService {
 	if next == nil || store == nil {
 		return next
 	}
@@ -37,7 +38,7 @@ func NewFeedService(next service.FeedService, store cachepkg.Store, cfg Config) 
 		ttl = 30 * time.Second
 	}
 
-	return &feedService{next: next, store: store, ttl: ttl}
+	return &feedService{next: next, userClient: userClient, store: store, ttl: ttl}
 }
 
 func (s *feedService) GetFeed(ctx context.Context, cursor string, limit uint32, tags []string) ([]models.FeedItem, string, bool, error) {
@@ -95,7 +96,13 @@ func (s *feedService) GetUserPolls(ctx context.Context, userID, cursor string, l
 }
 
 func (s *feedService) GetFollowingFeed(ctx context.Context, userID, cursor string, limit uint32) ([]models.FeedItem, string, bool, error) {
-	key := cacheKey("following-feed", strings.TrimSpace(userID), strings.TrimSpace(cursor), strconv.Itoa(normalizedLimit(limit)))
+	followingIDs, err := service.ListFollowingIDs(ctx, s.userClient)
+	if err != nil {
+		return nil, "", false, err
+	}
+
+	followingKey := cachepkg.HashParts(followingIDs...)
+	key := cacheKey("following-feed", strings.TrimSpace(userID), followingKey, strings.TrimSpace(cursor), strconv.Itoa(normalizedLimit(limit)))
 	var cached responseCache
 
 	found, err := cachepkg.GetJSON(ctx, s.store, key, &cached)
@@ -110,6 +117,17 @@ func (s *feedService) GetFollowingFeed(ctx context.Context, userID, cursor strin
 
 	_ = cachepkg.SetJSON(ctx, s.store, key, responseCache{Items: items, NextCursor: nextCursor, HasMore: hasMore}, s.ttl)
 	return items, nextCursor, hasMore, nil
+}
+
+func (s *feedService) Flush(ctx context.Context) error {
+	if s.store == nil {
+		return nil
+	}
+	return s.store.DeleteByPattern(ctx, "feed-service:*")
+}
+
+type Flusher interface {
+	Flush(ctx context.Context) error
 }
 
 type responseCache struct {

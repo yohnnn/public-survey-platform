@@ -186,6 +186,8 @@ func (s *inMemoryStore) Delete(_ context.Context, keys ...string) error {
 	return nil
 }
 
+func (s *inMemoryStore) DeleteByPattern(_ context.Context, _ string) error { return nil }
+
 func (s *inMemoryStore) Increment(_ context.Context, key string) (int64, error) {
 	current := int64(0)
 	if raw, ok := s.values[key]; ok {
