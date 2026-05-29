@@ -23,8 +23,13 @@
         "defaults": {
           "color": { "mode": "thresholds" },
           "mappings": [
-            { "type": "value", "value": "1", "text": "UP" },
-            { "type": "value", "value": "0", "text": "DOWN" }
+            {
+              "type": "value",
+              "options": {
+                "0": { "color": "red", "index": 0, "text": "DOWN" },
+                "1": { "color": "green", "index": 1, "text": "UP" }
+              }
+            }
           ],
           "thresholds": {
             "mode": "absolute",
@@ -78,12 +83,17 @@
       },
       "targets": [
         {
-          "expr": "sum by (service) (rate(http_requests_total[1m])) or sum by (service) (rate(grpc_server_requests_total[1m]))",
-          "legendFormat": "{{service}}",
+          "expr": "sum(rate(http_requests_total{service=\"api-service\"}[1m]))",
+          "legendFormat": "api-service HTTP",
           "refId": "A"
+        },
+        {
+          "expr": "sum by (service) (rate(grpc_server_requests_total[1m]))",
+          "legendFormat": "{{service}} gRPC",
+          "refId": "B"
         }
       ],
-      "title": "Request Rate",
+      "title": "Request Rate (HTTP + gRPC)",
       "type": "timeseries"
     },
     {
@@ -113,22 +123,17 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum by (service, le) (rate(http_request_duration_seconds_bucket[1m]))) or histogram_quantile(0.50, sum by (service, le) (rate(grpc_server_request_duration_seconds_bucket[1m])))",
-          "legendFormat": "{{service}} p50",
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{service=\"api-service\"}[1m])) by (le))",
+          "legendFormat": "api-service HTTP p95",
           "refId": "A"
         },
         {
-          "expr": "histogram_quantile(0.95, sum by (service, le) (rate(http_request_duration_seconds_bucket[1m]))) or histogram_quantile(0.95, sum by (service, le) (rate(grpc_server_request_duration_seconds_bucket[1m])))",
-          "legendFormat": "{{service}} p95",
+          "expr": "histogram_quantile(0.95, sum by (service, le) (rate(grpc_server_request_duration_seconds_bucket[1m])))",
+          "legendFormat": "{{service}} gRPC p95",
           "refId": "B"
-        },
-        {
-          "expr": "histogram_quantile(0.99, sum by (service, le) (rate(http_request_duration_seconds_bucket[1m]))) or histogram_quantile(0.99, sum by (service, le) (rate(grpc_server_request_duration_seconds_bucket[1m])))",
-          "legendFormat": "{{service}} p99",
-          "refId": "C"
         }
       ],
-      "title": "Request Duration (p50 / p95 / p99)",
+      "title": "Request Duration p95",
       "type": "timeseries"
     },
     {
@@ -158,9 +163,14 @@
       },
       "targets": [
         {
-          "expr": "sum by (service) (rate(http_requests_total{status=~\"4..|5..\"}[1m])) / sum by (service) (rate(http_requests_total[1m])) or sum by (service) (rate(grpc_server_requests_total{code!=\"OK\"}[1m])) / sum by (service) (rate(grpc_server_requests_total[1m]))",
-          "legendFormat": "{{service}}",
+          "expr": "sum(rate(http_requests_total{service=\"api-service\",status=~\"4..|5..\"}[1m])) / sum(rate(http_requests_total{service=\"api-service\"}[1m]))",
+          "legendFormat": "api-service HTTP",
           "refId": "A"
+        },
+        {
+          "expr": "sum by (service) (rate(grpc_server_requests_total{code!=\"OK\"}[1m])) / sum by (service) (rate(grpc_server_requests_total[1m]))",
+          "legendFormat": "{{service}} gRPC",
+          "refId": "B"
         }
       ],
       "title": "Error Ratio",
@@ -228,8 +238,8 @@
       },
       "targets": [
         {
-          "expr": "sum by (job) (go_goroutines)",
-          "legendFormat": "{{job}}",
+          "expr": "sum by (service) (go_goroutines)",
+          "legendFormat": "{{service}}",
           "refId": "A"
         }
       ],
@@ -263,8 +273,8 @@
       },
       "targets": [
         {
-          "expr": "sum by (job) (process_resident_memory_bytes)",
-          "legendFormat": "{{job}}",
+          "expr": "sum by (service) (process_resident_memory_bytes)",
+          "legendFormat": "{{service}}",
           "refId": "A"
         }
       ],
@@ -298,8 +308,8 @@
       },
       "targets": [
         {
-          "expr": "sum by (job) (rate(process_cpu_seconds_total[1m]))",
-          "legendFormat": "{{job}}",
+          "expr": "sum by (service) (rate(process_cpu_seconds_total[1m]))",
+          "legendFormat": "{{service}}",
           "refId": "A"
         }
       ],

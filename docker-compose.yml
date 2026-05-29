@@ -494,6 +494,7 @@ services:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/psp-platform-overview.json
     volumes:
       - grafana_data:/var/lib/grafana
       - ./back/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
