@@ -16,7 +16,7 @@ type Config struct {
 }
 
 func DefaultConfig() Config {
-	return Config{TTL: 60 * time.Second}
+	return Config{TTL: 15 * time.Second}
 }
 
 type analyticsService struct {
@@ -132,4 +132,24 @@ func cacheKey(kind, pollID string) string {
 		kind,
 		cachepkg.HashParts(strings.TrimSpace(pollID)),
 	)
+}
+
+func (s *analyticsService) FlushPoll(ctx context.Context, pollID string) error {
+	if s.store == nil {
+		return nil
+	}
+	pollID = strings.TrimSpace(pollID)
+	if pollID == "" {
+		return s.store.DeleteByPattern(ctx, "analytics-service:*")
+	}
+	for _, kind := range []string{"poll", "country", "gender", "age"} {
+		if err := s.store.Delete(ctx, cacheKey(kind, pollID)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type PollCacheFlusher interface {
+	FlushPoll(ctx context.Context, pollID string) error
 }

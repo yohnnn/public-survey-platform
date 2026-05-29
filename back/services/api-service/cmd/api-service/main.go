@@ -60,6 +60,11 @@ func main() {
 				}
 			}
 
+			viewerKey := strings.TrimSpace(req.Header.Get("X-Viewer-Key"))
+			if viewerKey != "" {
+				md.Set("x-viewer-key", viewerKey)
+			}
+
 			return md
 		}),
 	)

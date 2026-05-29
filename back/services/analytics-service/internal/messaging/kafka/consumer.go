@@ -95,7 +95,7 @@ func (c *AnalyticsConsumer) handleVoteCast(ctx context.Context, msg events.Messa
 				return err
 			}
 		}
-		if gender := strings.TrimSpace(payload.Gender); gender != "" {
+		if gender := normalizeGender(payload.Gender); gender != "" {
 			if err := c.repo.IncrementGenderVotes(txCtx, pollID, gender, 1); err != nil {
 				return err
 			}
@@ -146,7 +146,7 @@ func (c *AnalyticsConsumer) handleVoteRemoved(ctx context.Context, msg events.Me
 				return err
 			}
 		}
-		if gender := strings.TrimSpace(payload.Gender); gender != "" {
+		if gender := normalizeGender(payload.Gender); gender != "" {
 			if err := c.repo.IncrementGenderVotes(txCtx, pollID, gender, -1); err != nil {
 				return err
 			}

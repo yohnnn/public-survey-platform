@@ -7,10 +7,18 @@ import (
 	"github.com/yohnnn/public-survey-platform/back/services/feed-service/internal/models"
 )
 
+type DiscoveryCursor struct {
+	ImpressionCount int64
+	CreatedAt       time.Time
+	ID              string
+}
+
 type FeedListFilter struct {
 	CursorCreatedAt *time.Time
 	CursorID        string
 	CursorVotes     *int64
+	DiscoveryCursor *DiscoveryCursor
+	ExposureMaxAge  time.Duration
 	CreatorID       string
 	CreatorIDs      []string
 	Limit           int
@@ -28,6 +36,8 @@ type FeedRepository interface {
 	ApplyPendingVotes(ctx context.Context, feedItemID string) error
 	MarkEventProcessed(ctx context.Context, eventID, topic string) (bool, error)
 	GetFeed(ctx context.Context, filter FeedListFilter) ([]models.FeedItem, error)
+	GetDiscoveryFeed(ctx context.Context, filter FeedListFilter) ([]models.FeedItem, error)
+	RecordFeedImpressions(ctx context.Context, viewerKey string, feedItemIDs []string) (int, error)
 	GetTrending(ctx context.Context, filter FeedListFilter) ([]models.FeedItem, error)
 	GetUserPolls(ctx context.Context, filter FeedListFilter) ([]models.FeedItem, error)
 	GetFollowingFeed(ctx context.Context, filter FeedListFilter) ([]models.FeedItem, error)

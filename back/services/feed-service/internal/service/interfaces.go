@@ -10,10 +10,11 @@ import (
 )
 
 type FeedService interface {
-	GetFeed(ctx context.Context, cursor string, limit uint32, tags []string) ([]models.FeedItem, string, bool, error)
+	GetFeed(ctx context.Context, cursor string, limit uint32, tags []string, sort string) ([]models.FeedItem, string, bool, error)
 	GetTrending(ctx context.Context, cursor string, limit uint32) ([]models.FeedItem, string, bool, error)
 	GetUserPolls(ctx context.Context, userID, cursor string, limit uint32) ([]models.FeedItem, string, bool, error)
 	GetFollowingFeed(ctx context.Context, userID, cursor string, limit uint32) ([]models.FeedItem, string, bool, error)
+	RecordFeedImpressions(ctx context.Context, viewerKey string, feedItemIDs []string) (int32, error)
 }
 
 type FollowingReader interface {

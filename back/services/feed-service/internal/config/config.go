@@ -9,17 +9,21 @@ import (
 )
 
 type Config struct {
-	GRPCAddr          string
-	DatabaseURL       string
-	UserGRPCEndpoint  string
-	RedisAddr         string
-	RedisPassword     string
-	RedisDB           int
-	KafkaBrokers      []string
-	KafkaTopicPrefix  string
-	KafkaReadTimeout  time.Duration
-	KafkaCommitPeriod time.Duration
-	KafkaGroupID      string
+	GRPCAddr                  string
+	DatabaseURL               string
+	UserGRPCEndpoint          string
+	RedisAddr                 string
+	RedisPassword             string
+	RedisDB                   int
+	KafkaBrokers              []string
+	KafkaTopicPrefix          string
+	KafkaReadTimeout          time.Duration
+	KafkaCommitPeriod         time.Duration
+	KafkaGroupID              string
+	ExposureTargetDefault     int
+	ExposureMaxAge            time.Duration
+	DiscoverySlotsPerPage     int
+	ChronologicalSlotsPerPage int
 }
 
 func Load() (Config, error) {
@@ -34,7 +38,11 @@ func Load() (Config, error) {
 		KafkaTopicPrefix:  strings.TrimSpace(getEnv("KAFKA_TOPIC_PREFIX", "")),
 		KafkaReadTimeout:  getEnvDuration("KAFKA_READ_TIMEOUT", 10*time.Second),
 		KafkaCommitPeriod: getEnvDuration("KAFKA_COMMIT_PERIOD", time.Second),
-		KafkaGroupID:      strings.TrimSpace(getEnv("KAFKA_GROUP_ID", "feed-service")),
+		KafkaGroupID:              strings.TrimSpace(getEnv("KAFKA_GROUP_ID", "feed-service")),
+		ExposureTargetDefault:     getEnvInt("EXPOSURE_TARGET_DEFAULT", 100),
+		ExposureMaxAge:            getEnvDuration("EXPOSURE_MAX_AGE", 168*time.Hour),
+		DiscoverySlotsPerPage:     getEnvInt("DISCOVERY_SLOTS_PER_PAGE", 3),
+		ChronologicalSlotsPerPage: getEnvInt("CHRONOLOGICAL_SLOTS_PER_PAGE", 7),
 	}
 
 	if cfg.DatabaseURL == "" {

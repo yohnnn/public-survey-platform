@@ -40,9 +40,9 @@ func TestGetFeedInvalidCursor(t *testing.T) {
 	defer ctrl.Finish()
 
 	repo := mockrepo.NewMockFeedRepository(ctrl)
-	svc := NewFeedService(repo, nil)
+	svc := NewFeedService(repo, nil, DefaultFeedRankingConfig())
 
-	_, _, _, err := svc.GetFeed(context.Background(), "bad-cursor", 20, nil)
+	_, _, _, err := svc.GetFeed(context.Background(), "bad-cursor", 20, nil, "chronological")
 	if !errors.Is(err, models.ErrInvalidArgument) {
 		t.Fatalf("expected ErrInvalidArgument, got %v", err)
 	}
@@ -81,8 +81,8 @@ func TestGetFeedPaginatesAndEnriches(t *testing.T) {
 		nil,
 	)
 
-	svc := NewFeedService(repo, nil)
-	items, cursor, hasMore, err := svc.GetFeed(context.Background(), "", 2, []string{" Tag ", "tag", "x"})
+	svc := NewFeedService(repo, nil, DefaultFeedRankingConfig())
+	items, cursor, hasMore, err := svc.GetFeed(context.Background(), "", 2, []string{" Tag ", "tag", "x"}, "chronological")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -127,7 +127,7 @@ func TestGetTrendingInvalidCursor(t *testing.T) {
 	defer ctrl.Finish()
 
 	repo := mockrepo.NewMockFeedRepository(ctrl)
-	svc := NewFeedService(repo, nil)
+	svc := NewFeedService(repo, nil, DefaultFeedRankingConfig())
 
 	_, _, _, err := svc.GetTrending(context.Background(), "bad-cursor", 10)
 	if !errors.Is(err, models.ErrInvalidArgument) {
@@ -140,7 +140,7 @@ func TestGetUserPollsInvalidUserID(t *testing.T) {
 	defer ctrl.Finish()
 
 	repo := mockrepo.NewMockFeedRepository(ctrl)
-	svc := NewFeedService(repo, nil)
+	svc := NewFeedService(repo, nil, DefaultFeedRankingConfig())
 
 	_, _, _, err := svc.GetUserPolls(context.Background(), "   ", "", 10)
 	if !errors.Is(err, models.ErrInvalidArgument) {
@@ -187,7 +187,7 @@ func TestGetFollowingFeedPaginatesAndEnriches(t *testing.T) {
 			{Id: "u2", Nickname: "alice"},
 			{Id: "u3", Nickname: "bob"},
 		},
-	})
+	}, DefaultFeedRankingConfig())
 	items, cursor, hasMore, err := svc.GetFollowingFeed(context.Background(), "u1", "", 2)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

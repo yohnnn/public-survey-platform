@@ -284,7 +284,7 @@ func TestBackendE2EFullFlow(t *testing.T) {
 	}
 
 	updatedCountry := "US"
-	updatedGender := "other"
+	updatedGender := "female"
 	updatedBirthYear := int32(1997)
 	updateMeResp := client.mustJSON(t, http.MethodPatch, cfg.APIBaseURL, "/v1/users/me", accessToken1, map[string]any{
 		"country":   updatedCountry,

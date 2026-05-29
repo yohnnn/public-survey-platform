@@ -69,6 +69,12 @@ func main() {
 			}()
 			analyticsSvc = analyticscache.NewAnalyticsService(analyticsSvc, cacheStore, analyticscache.DefaultConfig())
 			flushAnalyticsCache = func(ctx context.Context, pollID string) {
+				if flusher, ok := analyticsSvc.(analyticscache.PollCacheFlusher); ok {
+					if err := flusher.FlushPoll(ctx, pollID); err != nil {
+						logger.Printf("flush analytics cache for poll %s error: %v", pollID, err)
+					}
+					return
+				}
 				if err := cacheStore.DeleteByPattern(ctx, "analytics-service:*"); err != nil {
 					logger.Printf("flush analytics cache error: %v", err)
 				}

@@ -1,68 +1,63 @@
 import {
   Bar,
   BarChart,
-  Cell,
-  Legend,
-  Pie,
-  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
-import type { AgeStat, CountryStat, GenderStat, Poll, PollAnalytics } from "../types/domain";
-import { toCount } from "../utils/format";
-
-const CHART_COLORS = ["#226d58", "#3d9178", "#5aad93", "#7bc4ad", "#9ad9c4", "#174c3e", "#688f7f", "#a8c9bc"];
+import type { AgeStat, CountryStat, GenderStat, Poll } from "../types/domain";
+import { genderLabel, toCount } from "../utils/format";
 
 interface PollAnalyticsChartsProps {
   poll: Poll;
-  analytics?: PollAnalytics;
   countries: CountryStat[];
   gender: GenderStat[];
   age: AgeStat[];
 }
 
-export function PollAnalyticsCharts({ poll, analytics, countries, gender, age }: PollAnalyticsChartsProps) {
-  const total = Number(poll.totalVotes || 0) || analytics?.totalVotes || 0;
-
-  const optionData = (poll.options || []).map((option) => ({
-    name: option.text || option.id,
-    votes: Number(option.votesCount || 0),
-  }));
+export function PollAnalyticsCharts({ poll, countries, gender, age }: PollAnalyticsChartsProps) {
+  const total = Number(poll.totalVotes || 0);
 
   const countryData = collapseTopItems(
-    [...countries].sort((a, b) => b.votes - a.votes).map((item) => ({ name: item.country || "—", votes: item.votes })),
+    [...countries]
+      .map((item) => ({ name: item.country || "—", votes: Number(item.votes || 0) }))
+      .filter((item) => item.votes > 0)
+      .sort((a, b) => b.votes - a.votes),
     8,
   );
 
-  const genderData = [...gender]
-    .sort((a, b) => b.votes - a.votes)
-    .map((item) => ({ name: formatGender(item.gender), votes: item.votes }));
+  const genderData = mergeGenderStats(gender)
+    .map((item) => ({ name: genderLabel(item.gender), votes: item.votes }))
+    .filter((item) => item.votes > 0)
+    .sort((a, b) => b.votes - a.votes);
 
   const ageData = [...age]
-    .sort((a, b) => b.votes - a.votes)
-    .map((item) => ({ name: item.ageRange || "—", votes: item.votes }));
+    .map((item) => ({ name: item.ageRange || "—", votes: Number(item.votes || 0) }))
+    .filter((item) => item.votes > 0)
+    .sort((a, b) => b.votes - a.votes);
 
-  if (!total) {
+  const hasDemographics = countryData.length > 0 || genderData.length > 0 || ageData.length > 0;
+
+  if (!total && !hasDemographics) {
     return <div className="chart-empty">Данных пока нет — нужны голоса участников.</div>;
   }
 
   return (
     <section className="stack">
       <div className="chart-grid">
-        <ChartCard title="По вариантам ответа">
-          {optionData.length ? (
-            <ResponsiveContainer width="100%" height={Math.max(160, optionData.length * 44)}>
-              <BarChart data={optionData} layout="vertical" margin={{ left: 8, right: 16, top: 4, bottom: 4 }}>
+        <ChartCard title="По полу">
+          {genderData.length ? (
+            <ResponsiveContainer width="100%" height={Math.max(180, genderData.length * 48)}>
+              <BarChart data={genderData} layout="vertical" margin={{ left: 8, right: 16, top: 4, bottom: 4 }}>
                 <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12 }} />
-                <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 12 }} />
+                <YAxis type="category" dataKey="name" width={96} tick={{ fontSize: 12 }} />
                 <Tooltip formatter={(value) => [toCount(Number(value)), "голосов"]} labelStyle={{ color: "#20231f" }} />
                 <Bar dataKey="votes" fill="#226d58" radius={[0, 6, 6, 0]} />
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <div className="chart-empty">Нет данных по вариантам.</div>
+            <div className="chart-empty">Нет данных по полу (у голосовавших не указан пол в профиле).</div>
           )}
         </ChartCard>
 
@@ -78,24 +73,6 @@ export function PollAnalyticsCharts({ poll, analytics, countries, gender, age }:
             </ResponsiveContainer>
           ) : (
             <div className="chart-empty">Нет данных по странам.</div>
-          )}
-        </ChartCard>
-
-        <ChartCard title="По полу">
-          {genderData.length ? (
-            <ResponsiveContainer width="100%" height={240}>
-              <PieChart>
-                <Pie data={genderData} dataKey="votes" nameKey="name" innerRadius={52} outerRadius={88} paddingAngle={2}>
-                  {genderData.map((entry, index) => (
-                    <Cell key={entry.name} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => [toCount(Number(value)), "голосов"]} />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="chart-empty">Нет данных по полу.</div>
           )}
         </ChartCard>
 
@@ -135,10 +112,21 @@ function collapseTopItems(items: { name: string; votes: number }[], limit: numbe
   return top;
 }
 
-function formatGender(value: string): string {
-  const normalized = value.trim().toLowerCase();
-  if (normalized === "male" || normalized === "m") return "Мужской";
-  if (normalized === "female" || normalized === "f") return "Женский";
-  if (!normalized) return "—";
-  return value;
+function mergeGenderStats(items: GenderStat[]): GenderStat[] {
+  const merged = new Map<string, number>();
+  for (const item of items) {
+    const key = normalizeGenderKey(item.gender);
+    if (!key) continue;
+    merged.set(key, (merged.get(key) || 0) + Number(item.votes || 0));
+  }
+  return [...merged.entries()].map(([gender, votes]) => ({ gender, votes }));
+}
+
+function normalizeGenderKey(value?: string): string {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase();
+  if (normalized === "m" || normalized === "male" || normalized === "man" || normalized === "мужской") return "male";
+  if (normalized === "f" || normalized === "female" || normalized === "woman" || normalized === "женский") return "female";
+  return "";
 }

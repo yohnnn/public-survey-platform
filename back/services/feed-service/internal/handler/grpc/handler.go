@@ -20,7 +20,7 @@ func NewHandler(svc service.FeedService) *Handler {
 }
 
 func (h *Handler) GetFeed(ctx context.Context, req *feedv1.GetFeedRequest) (*feedv1.GetFeedResponse, error) {
-	items, nextCursor, hasMore, err := h.svc.GetFeed(ctx, req.GetCursor(), req.GetLimit(), req.GetTags())
+	items, nextCursor, hasMore, err := h.svc.GetFeed(ctx, req.GetCursor(), req.GetLimit(), req.GetTags(), req.GetSort())
 	if err != nil {
 		return nil, toStatusError(err)
 	}
@@ -29,6 +29,15 @@ func (h *Handler) GetFeed(ctx context.Context, req *feedv1.GetFeedRequest) (*fee
 		Items: mapFeedItems(items),
 		Page:  mapCursorPageMeta(nextCursor, hasMore, req.GetLimit()),
 	}, nil
+}
+
+func (h *Handler) RecordFeedImpressions(ctx context.Context, req *feedv1.RecordFeedImpressionsRequest) (*feedv1.RecordFeedImpressionsResponse, error) {
+	recorded, err := h.svc.RecordFeedImpressions(ctx, req.GetViewerKey(), req.GetFeedItemIds())
+	if err != nil {
+		return nil, toStatusError(err)
+	}
+
+	return &feedv1.RecordFeedImpressionsResponse{Recorded: recorded}, nil
 }
 
 func (h *Handler) GetTrending(ctx context.Context, req *feedv1.GetTrendingRequest) (*feedv1.GetTrendingResponse, error) {

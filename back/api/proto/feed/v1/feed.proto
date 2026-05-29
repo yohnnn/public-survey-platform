@@ -41,6 +41,13 @@ service FeedService {
       get: "/v1/feed/following"
     };
   }
+
+  rpc RecordFeedImpressions(RecordFeedImpressionsRequest) returns (RecordFeedImpressionsResponse) {
+    option (google.api.http) = {
+      post: "/v1/feed/impressions"
+      body: "*"
+    };
+  }
 }
 
 message FeedOption {
@@ -91,6 +98,15 @@ message GetMyPollsRequest {
 message GetFollowingFeedRequest {
   string cursor = 1;
   uint32 limit = 2;
+}
+
+message RecordFeedImpressionsRequest {
+  string viewer_key = 1;
+  repeated string feed_item_ids = 2;
+}
+
+message RecordFeedImpressionsResponse {
+  int32 recorded = 1;
 }
 
 message GetFeedResponse {

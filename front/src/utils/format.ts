@@ -21,6 +21,26 @@ export function splitCSV(value?: string): string[] {
     .filter(Boolean);
 }
 
+export function normalizeGender(value?: string): string {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase();
+  if (normalized === "m" || normalized === "male" || normalized === "man" || normalized === "мужской") return "male";
+  if (normalized === "f" || normalized === "female" || normalized === "woman" || normalized === "женский") return "female";
+  return "";
+}
+
+export function genderLabel(value?: string): string {
+  switch (normalizeGender(value)) {
+    case "male":
+      return "Мужской";
+    case "female":
+      return "Женский";
+    default:
+      return "—";
+  }
+}
+
 export function detectAgeRange(birthYear: number, at = new Date()): string {
   if (!birthYear || birthYear <= 0) return "";
   const age = at.getFullYear() - birthYear;

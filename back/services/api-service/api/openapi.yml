@@ -1,17 +1,29 @@
 swagger: "2.0"
 info:
-  title: common/v1/errors.proto
+  title: analytics/v1/analytics.proto
   version: version not set
 tags:
-  - name: UserService
-  - name: PollService
-  - name: VoteService
-  - name: FeedService
   - name: AnalyticsService
+  - name: FeedService
+  - name: PollService
+  - name: UserService
+  - name: VoteService
 consumes:
   - application/json
 produces:
   - application/json
+schemes:
+  - http
+host: localhost:8080
+basePath: /
+securityDefinitions:
+  BearerAuth:
+    type: apiKey
+    name: Authorization
+    in: header
+    description: 'JWT access token. Example: Bearer <token>'
+security:
+  - BearerAuth: []
 paths:
   /v1/auth/login:
     post:
@@ -170,6 +182,26 @@ paths:
           required: false
           type: integer
           format: int64
+      tags:
+        - FeedService
+  /v1/feed/impressions:
+    post:
+      operationId: FeedService_RecordFeedImpressions
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1RecordFeedImpressionsResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: body
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/v1RecordFeedImpressionsRequest'
       tags:
         - FeedService
   /v1/feed/me:
@@ -1094,6 +1126,21 @@ definitions:
         format: int64
       isFollowing:
         type: boolean
+  v1RecordFeedImpressionsRequest:
+    type: object
+    properties:
+      viewerKey:
+        type: string
+      feedItemIds:
+        type: array
+        items:
+          type: string
+  v1RecordFeedImpressionsResponse:
+    type: object
+    properties:
+      recorded:
+        type: integer
+        format: int32
   v1RefreshTokenRequest:
     type: object
     properties:

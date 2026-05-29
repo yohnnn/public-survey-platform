@@ -7,6 +7,7 @@ import type {
   User,
   VoteState,
 } from "../types/domain";
+import { getViewerId } from "../utils/viewerId";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
@@ -26,6 +27,7 @@ type ApiOptions = {
   body?: unknown;
   auth?: boolean;
   skipRefresh?: boolean;
+  headers?: Record<string, string>;
 };
 
 export class ApiClient {
@@ -65,6 +67,18 @@ export class ApiClient {
 
   feed(path: string, search: string, auth = false) {
     return this.request<FeedResponse>(`${path}?${search}`, { auth });
+  }
+
+  recordFeedImpressions(feedItemIds: string[]) {
+    const viewerKey = getViewerId();
+    if (!viewerKey || feedItemIds.length === 0) {
+      return Promise.resolve({ recorded: 0 });
+    }
+    return this.request<{ recorded: number }>("/v1/feed/impressions", {
+      method: "POST",
+      body: { viewerKey, feedItemIds },
+      headers: { "X-Viewer-Key": viewerKey },
+    });
   }
 
   userPolls(userId: string, search: string) {
@@ -131,7 +145,7 @@ export class ApiClient {
 
   private async request<T = Record<string, never>>(path: string, options: ApiOptions = {}): Promise<T> {
     const { method = "GET", body, auth = false, skipRefresh = false } = options;
-    const headers: Record<string, string> = { Accept: "application/json" };
+    const headers: Record<string, string> = { Accept: "application/json", ...options.headers };
     const session = this.options.getSession();
     if (body !== undefined) headers["Content-Type"] = "application/json";
     if (auth && session.accessToken) headers.Authorization = `Bearer ${session.accessToken}`;

@@ -12,6 +12,12 @@ const httpErrorsByCode = new Counter('http_errors_by_code');
 
 const BASE_URL = 'http://localhost:8080';
 
+// Fair-feed thesis experiment (manual A/B):
+// 1) GET /v1/feed?limit=30                         — discovery + chronological mix (default)
+// 2) GET /v1/feed?limit=30&sort=chronological    — pure time ordering baseline
+// 3) POST /v1/feed/impressions with unique X-Viewer-Key per virtual user
+// Compare vote distribution by poll age and author Gini after running each mode.
+
 export const options = {
   stages: [
     { duration: '1m',  target: 20  },

@@ -59,7 +59,12 @@ func main() {
 
 	feedRepo := postgres.NewFeedRepository(pool)
 	txMgr := tx.NewManager(pool)
-	feedSvc := service.NewFeedService(feedRepo, userClient)
+	feedSvc := service.NewFeedService(feedRepo, userClient, service.FeedRankingConfig{
+		ExposureTargetDefault:     cfg.ExposureTargetDefault,
+		ExposureMaxAge:            cfg.ExposureMaxAge,
+		DiscoverySlotsPerPage:     cfg.DiscoverySlotsPerPage,
+		ChronologicalSlotsPerPage: cfg.ChronologicalSlotsPerPage,
+	})
 	var flushFeedCache func(context.Context)
 	if cfg.RedisAddr != "" {
 		cacheStore := redisstore.New(redisstore.Config{
@@ -108,9 +113,10 @@ func main() {
 
 	authInterceptor := grpcinterceptor.UnaryUserIDInterceptor(
 		map[string]struct{}{
-			feedv1.FeedService_GetFeed_FullMethodName:      {},
-			feedv1.FeedService_GetTrending_FullMethodName:  {},
-			feedv1.FeedService_GetUserPolls_FullMethodName: {},
+			feedv1.FeedService_GetFeed_FullMethodName:               {},
+			feedv1.FeedService_GetTrending_FullMethodName:           {},
+			feedv1.FeedService_GetUserPolls_FullMethodName:            {},
+			feedv1.FeedService_RecordFeedImpressions_FullMethodName: {},
 		},
 	)
 	loggingInterceptor := grpcinterceptor.UnaryLoggingInterceptor(serviceLogger.Slog())

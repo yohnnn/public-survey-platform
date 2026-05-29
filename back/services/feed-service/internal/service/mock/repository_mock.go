@@ -112,6 +112,21 @@ func (mr *MockFeedRepositoryMockRecorder) DeleteFeedItem(ctx, feedItemID any) *g
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteFeedItem", reflect.TypeOf((*MockFeedRepository)(nil).DeleteFeedItem), ctx, feedItemID)
 }
 
+// GetDiscoveryFeed mocks base method.
+func (m *MockFeedRepository) GetDiscoveryFeed(ctx context.Context, filter repository.FeedListFilter) ([]models.FeedItem, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetDiscoveryFeed", ctx, filter)
+	ret0, _ := ret[0].([]models.FeedItem)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetDiscoveryFeed indicates an expected call of GetDiscoveryFeed.
+func (mr *MockFeedRepositoryMockRecorder) GetDiscoveryFeed(ctx, filter any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDiscoveryFeed", reflect.TypeOf((*MockFeedRepository)(nil).GetDiscoveryFeed), ctx, filter)
+}
+
 // GetFeed mocks base method.
 func (m *MockFeedRepository) GetFeed(ctx context.Context, filter repository.FeedListFilter) ([]models.FeedItem, error) {
 	m.ctrl.T.Helper()
@@ -230,6 +245,21 @@ func (m *MockFeedRepository) MarkEventProcessed(ctx context.Context, eventID, to
 func (mr *MockFeedRepositoryMockRecorder) MarkEventProcessed(ctx, eventID, topic any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkEventProcessed", reflect.TypeOf((*MockFeedRepository)(nil).MarkEventProcessed), ctx, eventID, topic)
+}
+
+// RecordFeedImpressions mocks base method.
+func (m *MockFeedRepository) RecordFeedImpressions(ctx context.Context, viewerKey string, feedItemIDs []string) (int, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RecordFeedImpressions", ctx, viewerKey, feedItemIDs)
+	ret0, _ := ret[0].(int)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RecordFeedImpressions indicates an expected call of RecordFeedImpressions.
+func (mr *MockFeedRepositoryMockRecorder) RecordFeedImpressions(ctx, viewerKey, feedItemIDs any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecordFeedImpressions", reflect.TypeOf((*MockFeedRepository)(nil).RecordFeedImpressions), ctx, viewerKey, feedItemIDs)
 }
 
 // UpdateFeedItem mocks base method.

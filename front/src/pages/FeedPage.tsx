@@ -13,7 +13,7 @@ import { buildListSearch } from "../utils/format";
 const FEED_LIMIT = "30";
 
 const modeCopy: Record<string, { lead: string }> = {
-  "/": { lead: "Свежие опросы от всего сообщества" },
+  "/": { lead: "Новые опросы получают минимальный охват, затем — общая лента" },
   "/trending": { lead: "Самые обсуждаемые опросы прямо сейчас" },
   "/following": { lead: "Публикации авторов, на которых вы подписаны" },
 };
@@ -31,6 +31,9 @@ export function FeedPage() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [error, setError] = useState("");
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const impressionQueueRef = useRef<Set<string>>(new Set());
+  const impressionFlushRef = useRef<number | null>(null);
+  const recordedImpressionsRef = useRef<Set<string>>(new Set());
 
   const mode = feedModeByPath(location.pathname);
   const activeTags = useMemo(
@@ -43,6 +46,45 @@ export function FeedPage() {
     () => buildListSearch({ limit: FEED_LIMIT, tags: activeTags, includeTags: mode.tags }),
     [activeTags, mode.tags],
   );
+
+  const flushImpressions = useCallback(() => {
+    if (mode.path !== "/" || impressionQueueRef.current.size === 0) return;
+    const feedItemIds = Array.from(impressionQueueRef.current);
+    impressionQueueRef.current.clear();
+    feedItemIds.forEach((id) => recordedImpressionsRef.current.add(id));
+    void api.recordFeedImpressions(feedItemIds).catch(() => {
+      feedItemIds.forEach((id) => recordedImpressionsRef.current.delete(id));
+    });
+  }, [api, mode.path]);
+
+  const queueImpression = useCallback(
+    (feedItemId: string) => {
+      if (mode.path !== "/" || !feedItemId || recordedImpressionsRef.current.has(feedItemId)) return;
+      impressionQueueRef.current.add(feedItemId);
+      if (impressionFlushRef.current !== null) {
+        window.clearTimeout(impressionFlushRef.current);
+      }
+      impressionFlushRef.current = window.setTimeout(() => {
+        impressionFlushRef.current = null;
+        flushImpressions();
+      }, 400);
+    },
+    [flushImpressions, mode.path],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (impressionFlushRef.current !== null) {
+        window.clearTimeout(impressionFlushRef.current);
+      }
+      flushImpressions();
+    };
+  }, [flushImpressions]);
+
+  useEffect(() => {
+    recordedImpressionsRef.current.clear();
+    impressionQueueRef.current.clear();
+  }, [location.pathname, initialSearch]);
 
   const loadFeed = useCallback(
     async (search: string, append = false) => {
@@ -157,7 +199,7 @@ export function FeedPage() {
         />
       ) : null}
 
-      <PollList items={items} />
+      <PollList items={items} onPollVisible={mode.path === "/" ? queueImpression : undefined} />
       <div ref={sentinelRef} className="feed-sentinel" aria-hidden="true" />
       {loadingMore ? <p className="feed-loading-more">Загружаем ещё...</p> : null}
     </div>

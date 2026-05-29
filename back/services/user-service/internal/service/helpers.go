@@ -53,6 +53,17 @@ func normalizeNickname(nickname string) string {
 	return strings.TrimSpace(nickname)
 }
 
+func normalizeGender(gender string) (string, bool) {
+	switch strings.TrimSpace(strings.ToLower(gender)) {
+	case "male", "m", "мужской":
+		return "male", true
+	case "female", "f", "женский":
+		return "female", true
+	default:
+		return "", false
+	}
+}
+
 type systemClock struct{}
 
 func (systemClock) Now() time.Time {

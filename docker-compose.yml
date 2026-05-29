@@ -335,6 +335,10 @@ services:
       KAFKA_READ_TIMEOUT: 10s
       KAFKA_COMMIT_PERIOD: 1s
       KAFKA_GROUP_ID: feed-service
+      EXPOSURE_TARGET_DEFAULT: "100"
+      EXPOSURE_MAX_AGE: 168h
+      DISCOVERY_SLOTS_PER_PAGE: "3"
+      CHRONOLOGICAL_SLOTS_PER_PAGE: "7"
     ports:
       - "50054:50054"
       - "9105:9105"

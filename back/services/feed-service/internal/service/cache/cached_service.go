@@ -41,8 +41,12 @@ func NewFeedService(next service.FeedService, userClient service.FollowingReader
 	return &feedService{next: next, userClient: userClient, store: store, ttl: ttl}
 }
 
-func (s *feedService) GetFeed(ctx context.Context, cursor string, limit uint32, tags []string) ([]models.FeedItem, string, bool, error) {
-	key := cacheKey("feed", strings.TrimSpace(cursor), strconv.Itoa(normalizedLimit(limit)), strings.Join(normalizedTags(tags), ","))
+func (s *feedService) GetFeed(ctx context.Context, cursor string, limit uint32, tags []string, sort string) ([]models.FeedItem, string, bool, error) {
+	if !isChronologicalFeedSort(sort) {
+		return s.next.GetFeed(ctx, cursor, limit, tags, sort)
+	}
+
+	key := cacheKey("feed", "chronological", strings.TrimSpace(cursor), strconv.Itoa(normalizedLimit(limit)), strings.Join(normalizedTags(tags), ","))
 	var cached responseCache
 
 	found, err := cachepkg.GetJSON(ctx, s.store, key, &cached)
@@ -50,13 +54,33 @@ func (s *feedService) GetFeed(ctx context.Context, cursor string, limit uint32, 
 		return cached.Items, cached.NextCursor, cached.HasMore, nil
 	}
 
-	items, nextCursor, hasMore, err := s.next.GetFeed(ctx, cursor, limit, tags)
+	items, nextCursor, hasMore, err := s.next.GetFeed(ctx, cursor, limit, tags, sort)
 	if err != nil {
 		return nil, "", false, err
 	}
 
 	_ = cachepkg.SetJSON(ctx, s.store, key, responseCache{Items: items, NextCursor: nextCursor, HasMore: hasMore}, s.ttl)
 	return items, nextCursor, hasMore, nil
+}
+
+func (s *feedService) RecordFeedImpressions(ctx context.Context, viewerKey string, feedItemIDs []string) (int32, error) {
+	recorded, err := s.next.RecordFeedImpressions(ctx, viewerKey, feedItemIDs)
+	if err != nil {
+		return 0, err
+	}
+	if recorded > 0 && s.store != nil {
+		_ = s.store.DeleteByPattern(ctx, "feed-service:feed:*")
+	}
+	return recorded, nil
+}
+
+func isChronologicalFeedSort(sort string) bool {
+	switch strings.TrimSpace(strings.ToLower(sort)) {
+	case "chronological", "recent", "time":
+		return true
+	default:
+		return false
+	}
 }
 
 func (s *feedService) GetTrending(ctx context.Context, cursor string, limit uint32) ([]models.FeedItem, string, bool, error) {

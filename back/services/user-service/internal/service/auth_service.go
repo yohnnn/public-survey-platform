@@ -68,13 +68,18 @@ func (s *userService) Register(ctx context.Context, email, password, nickname, c
 		return AuthTokens{}, err
 	}
 
+	normalizedGender, ok := normalizeGender(gender)
+	if !ok {
+		return AuthTokens{}, models.ErrInvalidArgument
+	}
+
 	user := models.User{
 		ID:           s.ids.NewID(),
 		Nickname:     nickname,
 		Email:        email,
 		PasswordHash: passwordHash,
 		Country:      strings.TrimSpace(country),
-		Gender:       strings.TrimSpace(gender),
+		Gender:       normalizedGender,
 		BirthYear:    birthYear,
 		CreatedAt:    now,
 	}
@@ -305,8 +310,11 @@ func (s *userService) UpdateUser(ctx context.Context, userID string, input Updat
 	}
 
 	if input.Gender != nil {
-		gender := strings.TrimSpace(*input.Gender)
-		patch.Gender = &gender
+		normalizedGender, ok := normalizeGender(*input.Gender)
+		if !ok {
+			return models.User{}, models.ErrInvalidArgument
+		}
+		patch.Gender = &normalizedGender
 	}
 
 	if input.BirthYear != nil {

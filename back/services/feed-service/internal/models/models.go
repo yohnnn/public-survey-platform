@@ -3,15 +3,17 @@ package models
 import "time"
 
 type FeedItem struct {
-	ID         string
-	CreatorID  string
-	Author     FeedAuthor
-	Question   string
-	ImageURL   string
-	TotalVotes int64
-	CreatedAt  time.Time
-	Options    []FeedItemOption
-	Tags       []string
+	ID              string
+	CreatorID       string
+	Author          FeedAuthor
+	Question        string
+	ImageURL        string
+	TotalVotes      int64
+	ImpressionCount int64
+	ExposureTarget  int32
+	CreatedAt       time.Time
+	Options         []FeedItemOption
+	Tags            []string
 }
 
 type FeedItemOption struct {

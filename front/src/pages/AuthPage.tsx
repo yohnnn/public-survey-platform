@@ -83,7 +83,6 @@ export function AuthPage() {
                 <select name="gender" required defaultValue="male">
                   <option value="male">Мужской</option>
                   <option value="female">Женский</option>
-                  <option value="other">Другой</option>
                 </select>
               </label>
             </>

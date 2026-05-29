@@ -1,21 +1,29 @@
+import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useLiveUpdates } from "../data/liveUpdates";
 import { tagLabel } from "../data/tags";
 import type { FeedItem } from "../types/domain";
 import { formatDate, toCount } from "../utils/format";
 
-export function PollList({ items }: { items: FeedItem[] }) {
+export function PollList({
+  items,
+  onPollVisible,
+}: {
+  items: FeedItem[];
+  onPollVisible?: (feedItemId: string) => void;
+}) {
   if (!items.length) return <div className="empty">Пока здесь нет опросов.</div>;
   return (
     <div className="feed-list">
       {items.map((item) => (
-        <PollCard key={item.id} item={item} />
+        <PollCard key={item.id} item={item} onVisible={onPollVisible} />
       ))}
     </div>
   );
 }
 
-export function PollCard({ item }: { item: FeedItem }) {
+export function PollCard({ item, onVisible }: { item: FeedItem; onVisible?: (feedItemId: string) => void }) {
+  const cardRef = useRef<HTMLElement | null>(null);
   const { mergeFeedItem } = useLiveUpdates();
   const live = mergeFeedItem(item);
   const options = live.options || [];
@@ -23,8 +31,27 @@ export function PollCard({ item }: { item: FeedItem }) {
   const author = live.author;
   const authorId = author?.id || live.creatorId;
 
+  useEffect(() => {
+    if (!onVisible) return;
+    const element = cardRef.current;
+    if (!element) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (!entry?.isIntersecting || entry.intersectionRatio < 0.5) return;
+        onVisible(live.id);
+        observer.disconnect();
+      },
+      { threshold: [0.5] },
+    );
+
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [live.id, onVisible]);
+
   return (
-    <article className="card poll-card">
+    <article ref={cardRef} className="card poll-card">
       <div className="poll-card-header">
         <div>
           <h3>

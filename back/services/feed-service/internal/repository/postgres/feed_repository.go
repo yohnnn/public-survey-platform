@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -231,8 +232,8 @@ func (r *FeedRepository) GetFeed(ctx context.Context, filter repository.FeedList
 		filter.Limit = 20
 	}
 
-	base := `
-		SELECT id, creator_id, question, image_url, total_votes, created_at
+	feedItemsSelect := `
+		SELECT id, creator_id, question, image_url, total_votes, impression_count, exposure_target, created_at
 		FROM feed_items
 	`
 
@@ -256,7 +257,7 @@ func (r *FeedRepository) GetFeed(ctx context.Context, filter repository.FeedList
 		argPos++
 	}
 
-	query := base
+	query := feedItemsSelect
 	if len(where) > 0 {
 		query += " WHERE " + strings.Join(where, " AND ")
 	}
@@ -267,13 +268,126 @@ func (r *FeedRepository) GetFeed(ctx context.Context, filter repository.FeedList
 	return r.queryItems(ctx, query, args)
 }
 
+func (r *FeedRepository) GetDiscoveryFeed(ctx context.Context, filter repository.FeedListFilter) ([]models.FeedItem, error) {
+	if filter.Limit <= 0 {
+		filter.Limit = 20
+	}
+
+	base := `
+		SELECT id, creator_id, question, image_url, total_votes, impression_count, exposure_target, created_at
+		FROM feed_items
+	`
+
+	where := []string{
+		"impression_count < exposure_target",
+	}
+	args := make([]any, 0, 10)
+	argPos := 1
+
+	if filter.ExposureMaxAge > 0 {
+		where = append(where, fmt.Sprintf("created_at > $%d", argPos))
+		args = append(args, time.Now().Add(-filter.ExposureMaxAge))
+		argPos++
+	}
+
+	if filter.DiscoveryCursor != nil && strings.TrimSpace(filter.DiscoveryCursor.ID) != "" {
+		where = append(where, fmt.Sprintf(`(
+			impression_count > $%d
+			OR (impression_count = $%d AND created_at < $%d)
+			OR (impression_count = $%d AND created_at = $%d AND id < $%d)
+		)`, argPos, argPos, argPos+1, argPos, argPos+1, argPos+2))
+		args = append(args,
+			filter.DiscoveryCursor.ImpressionCount,
+			filter.DiscoveryCursor.CreatedAt,
+			filter.DiscoveryCursor.CreatedAt,
+			filter.DiscoveryCursor.ID,
+		)
+		argPos += 3
+	}
+
+	if len(filter.Tags) > 0 {
+		where = append(where, fmt.Sprintf(`EXISTS (
+			SELECT 1
+			FROM feed_item_tags fit
+			WHERE fit.feed_item_id = feed_items.id AND fit.tag = ANY($%d)
+		)`, argPos))
+		args = append(args, filter.Tags)
+		argPos++
+	}
+
+	query := base + " WHERE " + strings.Join(where, " AND ")
+	query += " ORDER BY impression_count ASC, created_at DESC, id DESC"
+	query += fmt.Sprintf(" LIMIT $%d", argPos)
+	args = append(args, filter.Limit)
+
+	return r.queryItems(ctx, query, args)
+}
+
+func (r *FeedRepository) RecordFeedImpressions(ctx context.Context, viewerKey string, feedItemIDs []string) (int, error) {
+	viewerKey = strings.TrimSpace(viewerKey)
+	if viewerKey == "" || len(feedItemIDs) == 0 {
+		return 0, nil
+	}
+
+	ids := make([]string, 0, len(feedItemIDs))
+	seen := make(map[string]struct{}, len(feedItemIDs))
+	for _, id := range feedItemIDs {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+	if len(ids) == 0 {
+		return 0, nil
+	}
+
+	const query = `
+		WITH inserted AS (
+			INSERT INTO feed_item_impressions (feed_item_id, viewer_key)
+			SELECT fi.id, $1
+			FROM feed_items fi
+			WHERE fi.id = ANY($2)
+			  AND fi.creator_id <> $1
+			ON CONFLICT DO NOTHING
+			RETURNING feed_item_id
+		)
+		UPDATE feed_items fi
+		SET impression_count = impression_count + 1
+		FROM inserted i
+		WHERE fi.id = i.feed_item_id
+		RETURNING fi.id
+	`
+
+	exec := tx.Executor(ctx, r.pool)
+	rows, err := exec.Query(ctx, query, viewerKey, ids)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+
+	recorded := 0
+	for rows.Next() {
+		recorded++
+	}
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
+
+	return recorded, nil
+}
+
 func (r *FeedRepository) GetTrending(ctx context.Context, filter repository.FeedListFilter) ([]models.FeedItem, error) {
 	if filter.Limit <= 0 {
 		filter.Limit = 20
 	}
 
 	base := `
-		SELECT id, creator_id, question, image_url, total_votes, created_at
+		SELECT id, creator_id, question, image_url, total_votes, impression_count, exposure_target, created_at
 		FROM feed_items
 	`
 
@@ -304,7 +418,7 @@ func (r *FeedRepository) GetUserPolls(ctx context.Context, filter repository.Fee
 	}
 
 	base := `
-		SELECT id, creator_id, question, image_url, total_votes, created_at
+		SELECT id, creator_id, question, image_url, total_votes, impression_count, exposure_target, created_at
 		FROM feed_items
 	`
 
@@ -342,7 +456,7 @@ func (r *FeedRepository) GetFollowingFeed(ctx context.Context, filter repository
 	}
 
 	base := `
-		SELECT id, creator_id, question, image_url, total_votes, created_at
+		SELECT id, creator_id, question, image_url, total_votes, impression_count, exposure_target, created_at
 		FROM feed_items
 	`
 
@@ -385,6 +499,8 @@ func (r *FeedRepository) queryItems(ctx context.Context, query string, args []an
 			&item.Question,
 			&item.ImageURL,
 			&item.TotalVotes,
+			&item.ImpressionCount,
+			&item.ExposureTarget,
 			&item.CreatedAt,
 		); scanErr != nil {
 			return nil, scanErr

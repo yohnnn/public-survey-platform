@@ -45,11 +45,8 @@ export function ProfilePage() {
     setFollowBusy(true);
     try {
       await api.follow(profile.id, profile.isFollowing);
-      setProfile({
-        ...profile,
-        isFollowing: nextFollowing,
-        followersCount: Math.max(0, profile.followersCount + (nextFollowing ? 1 : -1)),
-      });
+      const { profile: refreshed } = await api.profile(profile.id, true);
+      setProfile(refreshed);
       toast(nextFollowing ? "Вы подписались." : "Вы отписались.");
     } catch (err) {
       toast(err instanceof Error ? err.message : "Не удалось изменить подписку.", "error");

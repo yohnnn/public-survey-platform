@@ -8,7 +8,7 @@ import { useToast } from "../components/Toast";
 import { pollToLive, useLiveUpdates } from "../data/liveUpdates";
 import { tagLabel } from "../data/tags";
 import type { AgeStat, CountryStat, GenderStat, Poll, PollAnalytics, PublicUserProfile, VoteState } from "../types/domain";
-import { detectAgeRange, formatDate, toCount } from "../utils/format";
+import { detectAgeRange, formatDate, normalizeGender, toCount } from "../utils/format";
 
 export function PollPage() {
   const { id = "" } = useParams();
@@ -76,8 +76,14 @@ export function PollPage() {
         gender: settled(gender)?.items || [],
         age: settled(age)?.items || [],
       }));
+      return {
+        countries: settled(countries)?.items?.length || 0,
+        gender: settled(gender)?.items?.length || 0,
+        age: settled(age)?.items?.length || 0,
+        totalVotes: Number(settled(analytics)?.totalVotes || 0),
+      };
     } catch {
-      // analytics load failed silently — results still work
+      return undefined;
     }
   }, [api, id]);
 
@@ -91,7 +97,10 @@ export function PollPage() {
   function applyDemographicDelta(delta: number) {
     if (!delta || !me) return {};
     const countries = adjustStat(state.countries, "country", me.country, delta, (country) => ({ country, votes: delta }));
-    const gender = adjustStat(state.gender, "gender", me.gender, delta, (gender) => ({ gender, votes: delta }));
+    const gender = adjustStat(state.gender, "gender", normalizeGender(me.gender), delta, (gender) => ({
+      gender,
+      votes: delta,
+    }));
     const ageRange = detectAgeRange(me.birthYear);
     const age = ageRange
       ? adjustStat(state.age, "ageRange", ageRange, delta, (ageRange) => ({ ageRange, votes: delta }))
@@ -159,7 +168,7 @@ export function PollPage() {
     try {
       await api.vote(poll.id, optionIds);
       toast("Голос сохранён.");
-      scheduleAnalyticsRefresh();
+      scheduleAnalyticsRefresh(Number(poll.totalVotes || 0) + (prevVote?.hasVoted ? 0 : 1));
     } catch (error) {
       revertVoteOptimistic(prevPoll, prevVote, prevAnalytics);
       toast(error instanceof Error ? error.message : "Не удалось сохранить голос.", "error");
@@ -193,7 +202,7 @@ export function PollPage() {
     try {
       await api.removeVote(poll.id);
       toast("Голос удалён.");
-      scheduleAnalyticsRefresh();
+      scheduleAnalyticsRefresh(Math.max(0, Number(poll.totalVotes || 0) - 1));
     } catch (error) {
       revertVoteOptimistic(prevPoll, prevVote, prevAnalytics);
       toast(error instanceof Error ? error.message : "Не удалось удалить голос.", "error");
@@ -202,8 +211,21 @@ export function PollPage() {
     }
   }
 
-  function scheduleAnalyticsRefresh() {
-    window.setTimeout(() => setAnalyticsKey((k) => k + 1), 2500);
+  function scheduleAnalyticsRefresh(expectedVotes: number) {
+    let attempts = 0;
+
+    const tick = async () => {
+      attempts += 1;
+      const snapshot = await loadAnalytics();
+      const synced = snapshot && Number(snapshot.totalVotes || 0) >= expectedVotes;
+
+      if (synced || attempts >= 10) {
+        return;
+      }
+      window.setTimeout(() => void tick(), 500);
+    };
+
+    window.setTimeout(() => void tick(), 400);
   }
 
   if (state.loading) return <LoadingState title="Опрос" />;
@@ -272,7 +294,7 @@ export function PollPage() {
         <aside className="poll-side stack">
           <section className="card stack">
             <h3>Аналитика</h3>
-            <PollAnalyticsCharts poll={poll} analytics={state.analytics} countries={state.countries} gender={state.gender} age={state.age} />
+            <PollAnalyticsCharts poll={poll} countries={state.countries} gender={state.gender} age={state.age} />
           </section>
         </aside>
       </div>
@@ -295,7 +317,10 @@ function adjustStat<T extends { votes: number }>(
   if (!normalized || !delta) return items;
 
   const next = items.map((item) => ({ ...item }));
-  const index = next.findIndex((item) => String(item[key]) === normalized);
+  const index = next.findIndex((item) => {
+    const current = String(item[key]);
+    return key === "gender" ? normalizeGender(current) === normalized : current === normalized;
+  });
   if (index >= 0) {
     next[index] = { ...next[index], votes: Math.max(0, next[index].votes + delta) };
     return next.filter((item) => item.votes > 0);

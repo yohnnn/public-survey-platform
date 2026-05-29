@@ -12,23 +12,23 @@ import (
 type feedService struct {
 	feedRepo   repository.FeedRepository
 	userClient FollowingReader
+	ranking    FeedRankingConfig
 }
 
-func NewFeedService(feedRepo repository.FeedRepository, userClient FollowingReader) FeedService {
+func NewFeedService(feedRepo repository.FeedRepository, userClient FollowingReader, ranking FeedRankingConfig) FeedService {
 	return &feedService{
 		feedRepo:   feedRepo,
 		userClient: userClient,
+		ranking:    ranking.normalized(),
 	}
 }
 
-func (s *feedService) GetFeed(ctx context.Context, cursor string, limit uint32, tags []string) ([]models.FeedItem, string, bool, error) {
-	listLimit := int(limit)
-	if listLimit <= 0 {
-		listLimit = 20
+func (s *feedService) GetFeed(ctx context.Context, cursor string, limit uint32, tags []string, sort string) ([]models.FeedItem, string, bool, error) {
+	if !isChronologicalSort(sort) {
+		return s.getFairFeed(ctx, cursor, limit, tags)
 	}
-	if listLimit > 100 {
-		listLimit = 100
-	}
+
+	listLimit := normalizedListLimit(limit)
 
 	filter := repository.FeedListFilter{
 		Limit: listLimit + 1,
