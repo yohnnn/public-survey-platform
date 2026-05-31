@@ -17,6 +17,10 @@ Thumbs.db
 # Logs
 *.log
 
+# k6 load test artifacts
+back/k6/results.json
+back/k6/results-last.json
+
 # Python
 __pycache__/
 *.py[cod]
